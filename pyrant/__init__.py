@@ -34,7 +34,7 @@ import itertools
 from protocol import TyrantProtocol, TyrantError
 
 __version__ = '0.0.1'
-__all__ = ['Tyrant', 'TyrantError', 'TyrantProtocol']
+__all__ = ['Tyrant', 'TyrantError', 'TyrantProtocol', 'Q']
 
 # Constants
 DEFAULT_HOST = '127.0.0.1'
