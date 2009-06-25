@@ -121,9 +121,9 @@ class TyrantProtocol(object):
     ADDDOUBLE = 0x61
     EXT = 0x68
     SYNC = 0x70
-    VANISH = 0x71
-    COPY = 0x72
-    RESTORE = 0x73
+    VANISH = 0x72
+    COPY = 0x73
+    RESTORE = 0x74
     SETMST = 0x78
     RNUM = 0x80
     SIZE = 0x81

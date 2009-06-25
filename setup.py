@@ -30,11 +30,12 @@ setup(
     install_requires = ['setuptools'],
     include_package_data = True,
     classifiers = [
+      'Intended Audience :: Developers',
       'Development Status :: 4 - Beta',
+      'Programming Language :: Python',
       'Intended Audience :: Developers',
       'License :: OSI Approved :: Apache Software License',
       'Topic :: Software Development :: Libraries :: Python Modules',
-      'Topic :: Communications :: Chat',
-      'Topic :: Internet',
+      'Topic :: Database :: Front-Ends',
     ],
 )
