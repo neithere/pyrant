@@ -14,6 +14,13 @@ class TyrantError(Exception):
 
 # pyrant constants
 MAGIC_NUMBER = 0xc8
+ENCODING = 'UTF-8'
+
+
+def _ulen(expr):
+    return len(expr.encode(ENCODING)) \
+            if isinstance(expr, unicode) else len(expr)
+
 
 def _pack(code, *args):
     # Craft string that we'll use to send data based on args type and content
@@ -25,8 +32,11 @@ def _pack(code, *args):
             fmt += 'I'
             largs.append(arg)
 
-        elif isinstance(arg, (str, unicode)):
+        elif isinstance(arg, str):
             buf += arg
+
+        elif isinstance(arg, unicode):
+            buf += arg.encode(ENCODING)
         
         elif isinstance(arg, long):
             fmt += 'Q'
@@ -84,7 +94,7 @@ class _TyrantSocket(object):
 
     def get_str(self):
         """Get a string (n bytes, which is an integer just before string)."""
-        return self.recv(self.get_int())
+        return self.recv(self.get_int()).decode(ENCODING)
 
     def get_2long(self):
         """Get 2 long numbers (16 bytes) from socket"""
@@ -187,18 +197,18 @@ class TyrantProtocol(object):
     def put(self, key, value):
         """Unconditionally set key to value
         """
-        self._sock.send(self.PUT, len(key), len(value), key, value)
+        self._sock.send(self.PUT, _ulen(key), _ulen(value), key, value)
 
     def putkeep(self, key, value):
         """Set key to value if key does not already exist
         """
-        self._sock.send(self.PUTKEEP, len(key), len(value), key, value)
+        self._sock.send(self.PUTKEEP, _ulen(key), _ulen(value), key, value)
 
     def putcat(self, key, value):
         """Append value to the existing value for key, or set key to
         value if it does not already exist
         """
-        self._sock.send(self.PUTCAT, len(key), len(value), key, value)
+        self._sock.send(self.PUTCAT, _ulen(key), _ulen(value), key, value)
 
     def putshl(self, key, value, width):
         """Equivalent to::
@@ -206,23 +216,24 @@ class TyrantProtocol(object):
             self.putcat(key, value)
             self.put(key, self.get(key)[-width:])
         """
-        self._sock.send(self.PUTSHL, len(key), len(value), width, key, value)
+        self._sock.send(self.PUTSHL, _ulen(key), _ulen(value), width, key,
+                        value)
 
     def putnr(self, key, value):
         """Set key to value without waiting for a server response
         """
-        self._sock.send(self.PUTNR, len(key), len(value), key, value, 
+        self._sock.send(self.PUTNR, _ulen(key), _ulen(value), key, value, 
                          sync=False)
 
     def out(self, key):
         """Remove key from server
         """
-        self._sock.send(self.OUT, len(key), key)
+        self._sock.send(self.OUT, _ulen(key), key)
 
     def get(self, key):
         """Get the value of a key from the server
         """
-        self._sock.send(self.GET, len(key), key)
+        self._sock.send(self.GET, _ulen(key), key)
         return self._sock.get_str()
 
     def mget(self, klst):
@@ -235,7 +246,7 @@ class TyrantProtocol(object):
     def vsiz(self, key):
         """Get the size of a value for key
         """
-        self._sock.send(self.VSIZ, len(key), key)
+        self._sock.send(self.VSIZ, _ulen(key), key)
         return self._sock.get_int()
 
     def iterinit(self):
@@ -252,14 +263,14 @@ class TyrantProtocol(object):
     def fwmkeys(self, prefix, maxkeys):
         """Get up to the first maxkeys starting with prefix
         """
-        self._sock.send(self.FWMKEYS, len(prefix), maxkeys, prefix)
+        self._sock.send(self.FWMKEYS, _ulen(prefix), maxkeys, prefix)
         numkeys = self._sock.get_int()
         return [self._sock.get_str() for i in xrange(numkeys)]
 
     def addint(self, key, num):
         """Sum given integer to existing one
         """
-        self._sock.send(self.ADDINT, len(key), num, key)
+        self._sock.send(self.ADDINT, _ulen(key), num, key)
         return self._sock.get_int()
 
     def adddouble(self, key, num):
@@ -267,7 +278,7 @@ class TyrantProtocol(object):
         """
         fracpart, intpart = math.modf(num)
         fracpart, intpart = int(fracpart * 1e12), int(intpart)
-        self._sock.send(self.ADDDOUBLE, len(key), intpart, fracpart, key)
+        self._sock.send(self.ADDDOUBLE, _ulen(key), intpart, fracpart, key)
         return self._sock.get_2long()
 
     def ext(self, func, opts, key, value):
@@ -275,7 +286,7 @@ class TyrantProtocol(object):
 
         opts is a bitflag that can be RDBXOLCKREC for record locking
         and/or RDBXOLCKGLB for global locking"""
-        self._sock.send(self.EXT, len(func), opts, len(key), len(value),
+        self._sock.send(self.EXT, len(func), opts, _ulen(key), _ulen(value),
                         func, key, value)
         return self._sock.get_str()
 
@@ -292,12 +303,12 @@ class TyrantProtocol(object):
     def copy(self, path):
         """Hot-copy the database to path
         """
-        self._sock.send(self.COPY, len(path), path)
+        self._sock.send(self.COPY, _ulen(path), path)
 
     def restore(self, path, msec):
         """Restore the database from path at timestamp (in msec)
         """
-        self._sock.send(self.RESTORE, len(path), msec, path)
+        self._sock.send(self.RESTORE, _ulen(path), msec, path)
 
     def setmst(self, host, port):
         """Set master to host:port

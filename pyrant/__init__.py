@@ -15,7 +15,7 @@ This is an usage example:
 
     >>> import pyrant
     >>> t = pyrant.Tyrant(host='127.0.0.1', port=1978)
-    >>> if t.get_stats()['type'] != 'table':
+    >>> if t.dbtype != pyrant.DBTYPETABLE:
     ...     t['key'] = 'foo'
     ...     print t['key']
     ... else:
@@ -41,27 +41,51 @@ DEFAULT_HOST = '127.0.0.1'
 DEFAULT_PORT = 1978
 MAX_RESULTS = 1000
 
-def _parse_elem(elem):
-    # Check if returned element has \x00 inside, which means it is a table.
-    if '\x00' in elem:
+# Table Types
+DBTYPEBTREE = 'B+ tree'
+DBTYPETABLE = 'table'
+DBTYPEMEMORY = 'on-memory hash'
+DBTYPEHASH = 'hash'
+
+
+def _parse_elem(elem, dbtype, sep=None):
+    if dbtype == DBTYPETABLE:
+        # Split element by \x00 which is the column separator
         elems = elem.split('\x00')
+        if not elems[0]:
+            return None
+
         return dict((elems[i], elems[i + 1]) \
                         for i in xrange(0, len(elems), 2))
+    elif sep and sep in elem:
+        return elem.split(sep)
 
     return elem
 
  
 class Tyrant(dict):
     """Main class of Tyrant implementation. Acts like a python dictionary,
-    so you can query object using:
+    so you can query object using normal subscript operations.
     """
 
-    def __init__(self, host=DEFAULT_HOST, port=DEFAULT_PORT):
-        self._proto = TyrantProtocol(host, port)
+    def __init__(self, host=DEFAULT_HOST, port=DEFAULT_PORT, separator=None):
+        """
+        Acts like a python dictionary. Params are:
+            
+        host: Tyrant Host address
+        port: Tyrant port number
+        separator: If this parameter is set, you can put and get lists as
+        values.
+        """
+        # We want to make protocol public just in case anyone need any
+        # specific option
+        self.proto = TyrantProtocol(host, port)
+        self.dbtype = self.get_stats()['type']
+        self.separator = separator
 
     def __contains__(self, key):
         try:
-            self._proto.vsiz(key)
+            self.proto.vsiz(key)
         except TyrantError:
             return False
         else:
@@ -69,29 +93,36 @@ class Tyrant(dict):
 
     def __delitem__(self, key):
         try:
-            return self._proto.out(key)
+            return self.proto.out(key)
         except TyrantError:
             raise KeyError(key)
 
     def __getitem__(self, key):
         try:
-            return _parse_elem(self._proto.get(key))
+            return _parse_elem(self.proto.get(key), self.dbtype, 
+                               self.separator)
         except TyrantError:
             raise KeyError(key)
 
     def __len__(self):
-        return self._proto.rnum()
+        return self.proto.rnum()
 
     def __repr__(self):
         return object.__repr__(self)
 
     def __setitem__(self, key, value):
+        if isinstance(value, (str, unicode)):
+            self.proto.put(key, value)
+
         if isinstance(value, dict):
             flat = itertools.chain([key], *value.iteritems())
-            self._proto.misc('put', list(flat))
+            self.proto.misc('put', list(flat))
             
-        else:
-            self._proto.put(key, value)
+        elif isinstance(value, list):
+            assert self.separator, "Separator is not set"
+
+            flat = self.separator.join(value)
+            self.proto.put(key, flat)
 
     def call_func(self, func, key, value, record_locking=False, 
                   global_locking=False):
@@ -99,23 +130,23 @@ class Tyrant(dict):
         """
         opts = ((record_locking and TyrantProtocol.RDBXOLCKREC) |
                 (global_locking and TyrantProtocol.RDBXOLCKGLB))
-        return self._proto.ext(func, opts, key, value)
+        return self.proto.ext(func, opts, key, value)
 
     def clear(self):
         """Used in order to remove all records of a remote database object"""
-        self._proto.vanish()
+        self.proto.vanish()
 
     def concat(self, key, value, width=None):
         """Concatenate columns of the existing record"""
         if width is None:
-            self._proto.putcat(key, value)
+            self.proto.putcat(key, value)
         else:
-            self._proto.putshl(key, value, width)
+            self.proto.putshl(key, value, width)
 
     def get_size(self, key):
         """Get the size of the value of a record"""
         try:
-            return self._proto.vsiz(key)
+            return self.proto.vsiz(key)
         except TyrantError:
             raise KeyError(key)
 
@@ -125,14 +156,14 @@ class Tyrant(dict):
         format is a dictionary. 
         """ 
         return dict(l.split('\t', 1) \
-                        for l in self._proto.stat().splitlines() if l)
+                        for l in self.proto.stat().splitlines() if l)
 
     def iterkeys(self):
         """Iterate keys using remote operations"""
-        self._proto.iterinit()
+        self.proto.iterinit()
         try:
             while True:
-                yield self._proto.iternext()
+                yield self.proto.iternext()
         except TyrantError:
             pass
 
@@ -152,7 +183,7 @@ class Tyrant(dict):
         if not isinstance(keys, (list, tuple)):
             keys = list(keys)
 
-        self._proto.misc("outlist", keys, opts)
+        self.proto.misc("outlist", keys, opts)
 
     def multi_get(self, keys, no_update_log=False):
         """Returns a list of records that match given keys"""
@@ -160,7 +191,7 @@ class Tyrant(dict):
         if not isinstance(keys, (list, tuple)):
             keys = list(keys)
 
-        rval = self._proto.misc("getlist", keys, opts)
+        rval = self.proto.misc("getlist", keys, opts)
         
         if len(rval) <= len(keys):
             # 1.1.10 protocol, may return invalid results
@@ -170,7 +201,8 @@ class Tyrant(dict):
             return rval
 
         # 1.1.11 protocol returns interleaved key, value list
-        d = dict((rval[i], _parse_elem(rval[i + 1])) \
+        d = dict((rval[i], _parse_elem(rval[i + 1], self.dbtype, 
+                                       self.separator)) \
                     for i in xrange(0, len(rval), 2))
         return d
 
@@ -181,7 +213,7 @@ class Tyrant(dict):
         for k, v in items.iteritems():
             lst.extend((k, v))
 
-        self._proto.misc("putlist", lst, opts)
+        self.proto.misc("putlist", lst, opts)
 
     def prefix_keys(self, prefix, maxkeys=None):
         """Get forward matching keys in a database.
@@ -190,14 +222,14 @@ class Tyrant(dict):
         if maxkeys is None:
             maxkeys = len(self)
 
-        return self._proto.fwmkeys(prefix, maxkeys)
+        return self.proto.fwmkeys(prefix, maxkeys)
 
     def sync(self):
         """Synchronize updated content into database"""
-        self._proto.sync()
+        self.proto.sync()
 
     def _get_query(self):
-        return Query(self._proto)
+        return Query(self.proto, self.dbtype)
 
     query = property(_get_query)
 
@@ -208,6 +240,8 @@ class Q(object):
     Example:
         
         >>> t = Tyrant()
+        >>> t.dbtype == pyrant.DBTYPETABLE
+        True
         >>> t['i'] = {'name': 'Reflejo', 'test': 0}
         >>> t['you'] = {'name': 'Fulano', 'test': 1}
         >>> res = t.query.filter(Q(name='Reflejo'), Q(test=0))
@@ -261,8 +295,8 @@ class Query(object):
 
     # Insert object into database
     >>> t = Tyrant()
-    >>> t.get_stats()['type']
-    'table'
+    >>> t.dbtype == pyrant.DBTYPETABLE
+    True
     >>> t['i'] = {'name': 'Reflejo', 'test': 0}
 
     # Now let's see if we can reach it querying tyrant
@@ -272,12 +306,13 @@ class Query(object):
 
     """
 
-    def __init__(self, proto):
-        self._proto = proto
+    def __init__(self, proto, dbtype):
         self._conditions = []
         self._order = None
         self._order_t = 0
         self._cache = {}
+        self._proto = proto
+        self._dbtype = dbtype
 
     def order(self, name):
         """Define result order. name parameter is the column name. 
@@ -378,9 +413,12 @@ class Query(object):
 
         # Since results are keys, we need to query for actual values
         if isinstance(k, slice):
-            ret = [{key: _parse_elem(self._proto.get(key))} for key in keys]
+            ret = [{key: _parse_elem(self._proto.get(key), self._dbtype)} \
+                        for key in keys]
         else:
-            ret = {keys[0]: _parse_elem(self._proto.get(keys[0]))}
+            ret = {
+                keys[0]: _parse_elem(self._proto.get(keys[0]), self._dbtype)
+            }
 
         self._cache[cache_key] = ret
         return ret
