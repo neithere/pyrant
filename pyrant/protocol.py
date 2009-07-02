@@ -94,14 +94,18 @@ class _TyrantSocket(object):
 
     def get_str(self):
         """Get a string (n bytes, which is an integer just before string)."""
+        return self.recv(self.get_int())
+
+    def get_unicode(self):
+        """Get a unicode (n bytes, which is an integer just before string)."""
         return self.recv(self.get_int()).decode(ENCODING)
 
-    def get_2long(self):
+    def get_double(self):
         """Get 2 long numbers (16 bytes) from socket"""
         intpart, fracpart = struct.unpack('>QQ', self.recv(16))
         return intpart + (fracpart * 1e-12)
 
-    def get_strpair(self):
+    def get_unicodepair(self):
         """Get string pair (n bytes, n bytes which are 2 integers just 
         before pair)"""
         klen = self.get_int()
@@ -234,14 +238,27 @@ class TyrantProtocol(object):
         """Get the value of a key from the server
         """
         self._sock.send(self.GET, _ulen(key), key)
-        return self._sock.get_str()
+        return self._sock.get_unicode()
+
+    def getint(self, key):
+        """Get an integer for given key. Must been added by addint"""
+        self._sock.send(self.GET, _ulen(key), key)
+        val = self._sock.get_str()
+        return struct.unpack('I', val)[0]
+
+    def getdouble(self, key):
+        """Get a double for given key. Must been added by adddouble"""
+        self._sock.send(self.GET, _ulen(key), key)
+        val = self._sock.get_str()
+        intpart, fracpart = struct.unpack('>QQ', val)
+        return intpart + (fracpart * 1e-12)
 
     def mget(self, klst):
         """Get key,value pairs from the server for the given list of keys
         """
         self._sock.send(self.MGET, len(klst), klst)
         numrecs = self._sock.get_int()
-        return [self._sock.get_strpair() for i in xrange(numrecs)]
+        return [self._sock.get_unicodepair() for i in xrange(numrecs)]
 
     def vsiz(self, key):
         """Get the size of a value for key
@@ -258,14 +275,14 @@ class TyrantProtocol(object):
         """Get the next key after iterinit
         """
         self._sock.send(self.ITERNEXT)
-        return self._sock.get_str()
+        return self._sock.get_unicode()
 
     def fwmkeys(self, prefix, maxkeys):
         """Get up to the first maxkeys starting with prefix
         """
         self._sock.send(self.FWMKEYS, _ulen(prefix), maxkeys, prefix)
         numkeys = self._sock.get_int()
-        return [self._sock.get_str() for i in xrange(numkeys)]
+        return [self._sock.get_unicode() for i in xrange(numkeys)]
 
     def addint(self, key, num):
         """Sum given integer to existing one
@@ -278,8 +295,9 @@ class TyrantProtocol(object):
         """
         fracpart, intpart = math.modf(num)
         fracpart, intpart = int(fracpart * 1e12), int(intpart)
-        self._sock.send(self.ADDDOUBLE, _ulen(key), intpart, fracpart, key)
-        return self._sock.get_2long()
+        self._sock.send(self.ADDDOUBLE, _ulen(key), long(intpart), 
+                        long(fracpart), key)
+        return self._sock.get_double()
 
     def ext(self, func, opts, key, value):
         """Call func(key, value) with opts
@@ -288,7 +306,7 @@ class TyrantProtocol(object):
         and/or RDBXOLCKGLB for global locking"""
         self._sock.send(self.EXT, len(func), opts, _ulen(key), _ulen(value),
                         func, key, value)
-        return self._sock.get_str()
+        return self._sock.get_unicode()
 
     def sync(self):
         """Synchronize the database
@@ -331,7 +349,7 @@ class TyrantProtocol(object):
         """Get some statistics about the database
         """
         self._sock.send(self.STAT)
-        return self._sock.get_str()
+        return self._sock.get_unicode()
 
     def search(self, conditions, limit=10, offset=0, 
                order_type=0, order_field=None, opts=0):
@@ -366,6 +384,6 @@ class TyrantProtocol(object):
         finally:
             numrecs = self._sock.get_int()
         
-        return [self._sock.get_str() for i in xrange(numrecs)]
+        return [self._sock.get_unicode() for i in xrange(numrecs)]
 
 

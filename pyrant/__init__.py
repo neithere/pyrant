@@ -30,7 +30,7 @@ This is an usage example:
 
 """
 
-import itertools
+import itertools as _itertools
 from protocol import TyrantProtocol, TyrantError
 
 __version__ = '0.0.1'
@@ -111,18 +111,19 @@ class Tyrant(dict):
         return object.__repr__(self)
 
     def __setitem__(self, key, value):
-        if isinstance(value, (str, unicode)):
-            self.proto.put(key, value)
-
         if isinstance(value, dict):
-            flat = itertools.chain([key], *value.iteritems())
+            flat = _itertools.chain([key], *value.iteritems())
             self.proto.misc('put', list(flat))
             
-        elif isinstance(value, list):
+        elif isinstance(value, (list, tuple)):
             assert self.separator, "Separator is not set"
 
             flat = self.separator.join(value)
             self.proto.put(key, flat)
+
+        else:
+            self.proto.put(key, value)
+
 
     def call_func(self, func, key, value, record_locking=False, 
                   global_locking=False):
@@ -211,9 +212,21 @@ class Tyrant(dict):
         opts = (no_update_log and TyrantProtocol.RDBMONOULOG or 0)
         lst = []
         for k, v in items.iteritems():
+            if isinstance(v, (list, tuple)):
+                assert self.separator, "Separator is not set"
+
+                v = self.separator.join(v)
             lst.extend((k, v))
 
         self.proto.misc("putlist", lst, opts)
+
+    def get_int(self, key):
+        """Get an integer for given key. Must been added by addint"""
+        return self.proto.getint(key)
+    
+    def get_double(self, key):
+        """Get a double for given key. Must been added by adddouble"""
+        return self.proto.getdouble(key)
 
     def prefix_keys(self, prefix, maxkeys=None):
         """Get forward matching keys in a database.
