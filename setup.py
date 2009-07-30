@@ -20,7 +20,7 @@ from setuptools import setup
 
 setup(
     name = "pyrant",
-    version = "0.0.1",
+    version = "0.0.2",
     url = 'http://code.google.com/p/pyrant/',
     license = 'Apache License 2.0',
     description='A python wrapper around Tyrant Implamentation',

@@ -362,7 +362,7 @@ class TyrantProtocol(object):
             args += ['setorder\x00%s\x00%d' % (order_field, order_type)]
 
         # Set limit and offset
-        if limit > 0 and offset > 0:
+        if limit > 0 and offset >= 0:
             args += ['setlimit\x00%d\x00%d' % (limit, offset)]
 
         return self.misc('search', args, opts)

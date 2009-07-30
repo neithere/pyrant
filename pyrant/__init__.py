@@ -253,13 +253,14 @@ class Q(object):
     Example:
         
         >>> t = Tyrant()
+        >>> t.clear()
         >>> t.dbtype == pyrant.DBTYPETABLE
         True
         >>> t['i'] = {'name': 'Reflejo', 'test': 0}
         >>> t['you'] = {'name': 'Fulano', 'test': 1}
         >>> res = t.query.filter(Q(name='Reflejo'), Q(test=0))
         >>> res[0]['i']['name']
-        'Reflejo'
+        u'Reflejo'
         >>> res = t.query.filter(Q(name='Reflejo') | Q(name='Fulano'))
         >>> len(res)
         2
@@ -366,10 +367,14 @@ class Query(object):
         Example:
             >>> t = Tyrant()
             >>> t.get_stats()['type']
-            'table'
+            u'table'
             >>> t['i'] = {'name': 'Reflejo', 'test': 4}
+            >>> t['i2'] = {'name': 'Reflejo', 'test': 4}
+            >>> t['i3'] = {'name': 'Reflejo', 'test': 4}
 
-            >>> res = t.query.filter(test__gt=0)
+            >>> res = t.query.filter(test__gt=0)[:1]
+            >>> len(res) == 1
+            True
             >>> print res[0]['i']['name']
             Reflejo
 
