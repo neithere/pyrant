@@ -352,6 +352,8 @@ class Query(object):
         if self._order != order[0] or self._order_t != order[1]:
             # Add another rule means that our naive cache should be empty'ed
             self._cache = {}
+            self._order = order[0]
+            self._order_t = order[1]
 
         return self
 
