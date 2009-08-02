@@ -33,7 +33,7 @@ This is an usage example:
 import itertools as _itertools
 from protocol import TyrantProtocol, TyrantError
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 __all__ = ['Tyrant', 'TyrantError', 'TyrantProtocol', 'Q']
 
 # Constants
@@ -68,7 +68,8 @@ class Tyrant(dict):
     so you can query object using normal subscript operations.
     """
 
-    def __init__(self, host=DEFAULT_HOST, port=DEFAULT_PORT, separator=None):
+    def __init__(self, host=DEFAULT_HOST, port=DEFAULT_PORT, separator=None, 
+                 literal=False):
         """
         Acts like a python dictionary. Params are:
             
@@ -76,12 +77,14 @@ class Tyrant(dict):
         port: Tyrant port number
         separator: If this parameter is set, you can put and get lists as
         values.
+        literal: If is set string is returned instead of unicode
         """
         # We want to make protocol public just in case anyone need any
         # specific option
         self.proto = TyrantProtocol(host, port)
         self.dbtype = self.get_stats()['type']
         self.separator = separator
+        self.literal = literal
 
     def __contains__(self, key):
         try:
@@ -99,7 +102,7 @@ class Tyrant(dict):
 
     def __getitem__(self, key):
         try:
-            return _parse_elem(self.proto.get(key), self.dbtype, 
+            return _parse_elem(self.proto.get(key, self.literal), self.dbtype,
                                self.separator)
         except TyrantError:
             raise KeyError(key)
@@ -433,11 +436,13 @@ class Query(object):
 
         # Since results are keys, we need to query for actual values
         if isinstance(k, slice):
-            ret = [{key: _parse_elem(self._proto.get(key), self._dbtype)} \
+            ret = [{key: _parse_elem(self._proto.get(key, self.literal),
+                                     self._dbtype)} \
                         for key in keys]
         else:
             ret = {
-                keys[0]: _parse_elem(self._proto.get(keys[0]), self._dbtype)
+                keys[0]: _parse_elem(self._proto.get(keys[0], self.literal), 
+                                     self._dbtype)
             }
 
         self._cache[cache_key] = ret

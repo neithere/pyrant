@@ -97,15 +97,15 @@ class _TyrantSocket(object):
         return self.recv(self.get_int())
 
     def get_unicode(self):
-        """Get a unicode (n bytes, which is an integer just before string)."""
-        return self.recv(self.get_int()).decode(ENCODING)
+        """Get a unicode."""
+        return self.get_str().decode(ENCODING)
 
     def get_double(self):
         """Get 2 long numbers (16 bytes) from socket"""
         intpart, fracpart = struct.unpack('>QQ', self.recv(16))
         return intpart + (fracpart * 1e-12)
 
-    def get_unicodepair(self):
+    def get_strpair(self):
         """Get string pair (n bytes, n bytes which are 2 integers just 
         before pair)"""
         klen = self.get_int()
@@ -234,11 +234,11 @@ class TyrantProtocol(object):
         """
         self._sock.send(self.OUT, _ulen(key), key)
 
-    def get(self, key):
+    def get(self, key, literal=False):
         """Get the value of a key from the server
         """
         self._sock.send(self.GET, _ulen(key), key)
-        return self._sock.get_unicode()
+        return self._sock.get_str() if literal else self._sock.get_unicode()
 
     def getint(self, key):
         """Get an integer for given key. Must been added by addint"""
@@ -258,7 +258,7 @@ class TyrantProtocol(object):
         """
         self._sock.send(self.MGET, len(klst), klst)
         numrecs = self._sock.get_int()
-        return [self._sock.get_unicodepair() for i in xrange(numrecs)]
+        return [self._sock.get_strpair() for i in xrange(numrecs)]
 
     def vsiz(self, key):
         """Get the size of a value for key
