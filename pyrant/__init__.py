@@ -1,14 +1,15 @@
+# -*- coding: utf-8 -*-
 """
-A pythonic python-only implementation of Tokyo Tyrant protocol. 
+A pythonic python-only implementation of Tokyo Tyrant protocol.
 Python 2.4+ is needed.
 
 This library takes a "pythonic" approach to make it more clear and easy
 to implement.
 
-More information about Tokyo Cabinet: 
+More information about Tokyo Cabinet:
     http://tokyocabinet.sourceforge.net/
 
-More information about Tokyo Tyrant: 
+More information about Tokyo Tyrant:
     http://tokyocabinet.sourceforge.net/tyrantdoc/
 
 This is an usage example:
@@ -62,17 +63,17 @@ def _parse_elem(elem, dbtype, sep=None):
 
     return elem
 
- 
+
 class Tyrant(dict):
     """Main class of Tyrant implementation. Acts like a python dictionary,
     so you can query object using normal subscript operations.
     """
 
-    def __init__(self, host=DEFAULT_HOST, port=DEFAULT_PORT, separator=None, 
+    def __init__(self, host=DEFAULT_HOST, port=DEFAULT_PORT, separator=None,
                  literal=False):
         """
         Acts like a python dictionary. Params are:
-            
+
         host: Tyrant Host address
         port: Tyrant port number
         separator: If this parameter is set, you can put and get lists as
@@ -109,7 +110,7 @@ class Tyrant(dict):
 
     def get(self, key, default=None):
         """Allow for getting with a default.
-          
+
            >>> t = Tyrant()
            >>> t['foo'] = {'a': 'z', 'b': 'y'}
            >>> print t.get('foo', {})
@@ -133,7 +134,7 @@ class Tyrant(dict):
         if isinstance(value, dict):
             flat = _itertools.chain([key], *value.iteritems())
             self.proto.misc('put', list(flat))
-            
+
         elif isinstance(value, (list, tuple)):
             assert self.separator, "Separator is not set"
 
@@ -144,7 +145,7 @@ class Tyrant(dict):
             self.proto.put(key, value)
 
 
-    def call_func(self, func, key, value, record_locking=False, 
+    def call_func(self, func, key, value, record_locking=False,
                   global_locking=False):
         """Call specific function.
         """
@@ -172,9 +173,9 @@ class Tyrant(dict):
 
     def get_stats(self):
         """Get the status string of the database.
-        The return value is the status message of the database.The message 
-        format is a dictionary. 
-        """ 
+        The return value is the status message of the database.The message
+        format is a dictionary.
+        """
         return dict(l.split('\t', 1) \
                         for l in self.proto.stat().splitlines() if l)
 
@@ -212,7 +213,7 @@ class Tyrant(dict):
             keys = list(keys)
 
         rval = self.proto.misc("getlist", keys, opts)
-        
+
         if len(rval) <= len(keys):
             # 1.1.10 protocol, may return invalid results
             if len(rval) < len(keys):
@@ -221,7 +222,7 @@ class Tyrant(dict):
             return rval
 
         # 1.1.11 protocol returns interleaved key, value list
-        d = dict((rval[i], _parse_elem(rval[i + 1], self.dbtype, 
+        d = dict((rval[i], _parse_elem(rval[i + 1], self.dbtype,
                                        self.separator)) \
                     for i in xrange(0, len(rval), 2))
         return d
@@ -242,7 +243,7 @@ class Tyrant(dict):
     def get_int(self, key):
         """Get an integer for given key. Must been added by addint"""
         return self.proto.getint(key)
-    
+
     def get_double(self, key):
         """Get a double for given key. Must been added by adddouble"""
         return self.proto.getdouble(key)
@@ -270,7 +271,7 @@ class Q(object):
     """Condition object. You can | this type to ORs conditions,
     but you cannot use operand "&", to do this just add more Q to your filter
     Example:
-        
+
         >>> t = Tyrant()
         >>> t.clear()
         >>> t.dbtype == pyrant.DBTYPETABLE
@@ -286,7 +287,7 @@ class Q(object):
 
     """
 
-    def __init__(self, **kwargs):
+    def __init__(self, negate=False, **kwargs):
         assert kwargs, "You need to specify at least one condition"
 
         for kw, val in kwargs.iteritems():
@@ -295,24 +296,26 @@ class Q(object):
             self._op += nameop[1] if len(nameop) > 1 else 'eq'
             self.name = nameop[0]
             self.expr = val
+            self.negate = negate
 
     def __or__(self, q):
         import copy
         assert isinstance(q, Q), "Unsupported operand type(s) for |"
-        
+
         op = '%s_or' % q._op
         if q._op == self._op and op in TyrantProtocol.conditionsmap:
             qcopy = copy.copy(q)
             qcopy._op = op
             qcopy.expr = "%s,%s" % (q.expr , self.expr)
-            
+
             return qcopy
         else:
             raise TypeError("Unsoported operand for |. You can only do this "\
                             "on contains or eq")
 
     def _getop(self):
-        return TyrantProtocol.conditionsmap[self._op]
+        op = TyrantProtocol.conditionsmap[self._op]
+        return op | TyrantProtocol.RDBQCNEGATE if self.negate else op
 
     op = property(_getop)
 
@@ -349,7 +352,7 @@ class Query(object):
         self.literal = literal
 
     def order(self, name):
-        """Define result order. name parameter is the column name. 
+        """Define result order. name parameter is the column name.
         You can prefix "-" to order desc.
         If "#" is added just before column name, column are ordered as numbers
 
@@ -377,9 +380,15 @@ class Query(object):
 
         return self
 
+    def exclude(self, *args, **kwargs):
+        return self._filter(negate=True, *args, **kwargs)
+
     def filter(self, *args, **kwargs):
+        return self._filter(negate=False, *args, **kwargs)
+
+    def _filter(self, negate, *args, **kwargs):
         """Add condition to query. This could be done by Q object or by keyword
-        arguments. Keys are: 
+        arguments. Keys are:
             __eq: Equals (default) to expression
             __lt: Less than expression
             __le: Less or equal to expression
@@ -401,17 +410,21 @@ class Query(object):
             Reflejo
 
         """
+
+        # FIXME this changes current Query object, not clones it!!!
+
         # Add another rule means that our naive cache should be empty'ed
         self._cache = {}
 
         # Iterate arguments. Should be instances of Q
         for q in args:
             assert isinstance(q, Q), "Arguments must be instances of Q"
+            q.negate = not q.negate
             self._conditions.append(q)
 
         # Generate Q with arguments as needed
         for name, expr in kwargs.iteritems():
-            self._conditions.append(Q(**{name: expr}))
+            self._conditions.append(Q(negate=negate, **{name: expr}))
 
         return self
 
@@ -458,9 +471,10 @@ class Query(object):
                         for key in keys]
         else:
             ret = {
-                keys[0]: _parse_elem(self._proto.get(keys[0], self.literal), 
+                keys[0]: _parse_elem(self._proto.get(keys[0], self.literal),
                                      self._dbtype)
             }
 
         self._cache[cache_key] = ret
+
         return ret

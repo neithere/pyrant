@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2009 Atommica. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +21,7 @@ from setuptools import setup
 
 setup(
     name = "pyrant",
-    version = "0.0.2",
+    version = "0.0.3",
     url = 'http://code.google.com/p/pyrant/',
     license = 'Apache License 2.0',
     description='A python wrapper around Tyrant Implamentation',

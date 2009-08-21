@@ -161,8 +161,9 @@ class TyrantProtocol(object):
     RDBQCNUMLE = 12   # number is less than or equal to
     RDBQCNUMBT = 13   # number is between two tokens of
     RDBQCNUMOREQ = 14 # number is equal to at least one token in
-    RDBQCNEGATE = 15  # negation flag
     RDBQCNOIDX = 16   # no index flag
+
+    RDBQCNEGATE = 1 << 24  # negation flag
 
     # Order
     RDBQOSTRASC = 0   # string ascending
