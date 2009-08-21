@@ -21,13 +21,13 @@ from setuptools import setup
 
 setup(
     name = "pyrant",
-    version = "0.0.3",
+    version = "0.0.4",
     url = 'http://code.google.com/p/pyrant/',
     license = 'Apache License 2.0',
-    description='A python wrapper around Tyrant Implamentation',
+    description='A python wrapper around Tokyo Tyrant',
     author = 'Martin Conte Mac Donell',
     author_email = 'Reflejo@gmail.com',
-    packages = ['pyrant'],
+    packages = ['pyrant', 'pyrant.models'],
     install_requires = ['setuptools'],
     include_package_data = True,
     classifiers = [

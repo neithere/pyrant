@@ -351,6 +351,10 @@ class Query(object):
         self._dbtype = dbtype
         self.literal = literal
 
+    @staticmethod
+    def decorate(k, v):
+        return {k: v}
+
     def order(self, name):
         """Define result order. name parameter is the column name.
         You can prefix "-" to order desc.
@@ -466,14 +470,12 @@ class Query(object):
 
         # Since results are keys, we need to query for actual values
         if isinstance(k, slice):
-            ret = [{key: _parse_elem(self._proto.get(key, self.literal),
-                                     self._dbtype)} \
-                        for key in keys]
+            ret = [self.decorate(key, _parse_elem(self._proto.get(key, self.literal),
+                                                  self._dbtype))
+                   for key in keys]
         else:
-            ret = {
-                keys[0]: _parse_elem(self._proto.get(keys[0], self.literal),
-                                     self._dbtype)
-            }
+            ret = self.decorate(keys[0], _parse_elem(self._proto.get(keys[0], self.literal),
+                                                     self._dbtype))
 
         self._cache[cache_key] = ret
 
