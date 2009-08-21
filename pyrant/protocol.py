@@ -1,5 +1,6 @@
+# -*- coding: utf-8 -*-
 """
-Protocol implementation for Tyrant 
+Protocol implementation for Tyrant
 <http://tokyocabinet.sourceforge.net/tyrantdoc/>
 """
 
@@ -37,7 +38,7 @@ def _pack(code, *args):
 
         elif isinstance(arg, unicode):
             buf += arg.encode(ENCODING)
-        
+
         elif isinstance(arg, long):
             fmt += 'Q'
             largs.append(arg)
@@ -106,7 +107,7 @@ class _TyrantSocket(object):
         return intpart + (fracpart * 1e-12)
 
     def get_strpair(self):
-        """Get string pair (n bytes, n bytes which are 2 integers just 
+        """Get string pair (n bytes, n bytes which are 2 integers just
         before pair)"""
         klen = self.get_int()
         vlen = self.get_int()
@@ -145,29 +146,29 @@ class TyrantProtocol(object):
     MISC = 0x90
 
     # Query conditions
-    RDBQCSTREQ = 0    # string is equal to 
-    RDBQCSTRINC = 1   # string is included in 
-    RDBQCSTRBW = 2    # string begins with 
-    RDBQCSTREW = 3    # string ends with 
-    RDBQCSTRAND = 4   # string includes all tokens in 
-    RDBQCSTROR = 5    # string includes at least one token in 
-    RDBQCSTROREQ = 6  # string is equal to at least one token in 
-    RDBQCSTRRX = 7    # string matches regular expressions of 
-    RDBQCNUMEQ = 8    # number is equal to 
-    RDBQCNUMGT = 9    # number is greater than 
-    RDBQCNUMGE = 10   # number is greater than or equal to 
-    RDBQCNUMLT = 11   # number is less than 
-    RDBQCNUMLE = 12   # number is less than or equal to 
-    RDBQCNUMBT = 13   # number is between two tokens of 
-    RDBQCNUMOREQ = 14 # number is equal to at least one token in 
-    RDBQCNEGATE = 15  # negation flag 
-    RDBQCNOIDX = 16   # no index flag 
+    RDBQCSTREQ = 0    # string is equal to
+    RDBQCSTRINC = 1   # string is included in
+    RDBQCSTRBW = 2    # string begins with
+    RDBQCSTREW = 3    # string ends with
+    RDBQCSTRAND = 4   # string includes all tokens in
+    RDBQCSTROR = 5    # string includes at least one token in
+    RDBQCSTROREQ = 6  # string is equal to at least one token in
+    RDBQCSTRRX = 7    # string matches regular expressions of
+    RDBQCNUMEQ = 8    # number is equal to
+    RDBQCNUMGT = 9    # number is greater than
+    RDBQCNUMGE = 10   # number is greater than or equal to
+    RDBQCNUMLT = 11   # number is less than
+    RDBQCNUMLE = 12   # number is less than or equal to
+    RDBQCNUMBT = 13   # number is between two tokens of
+    RDBQCNUMOREQ = 14 # number is equal to at least one token in
+    RDBQCNEGATE = 15  # negation flag
+    RDBQCNOIDX = 16   # no index flag
 
     # Order
-    RDBQOSTRASC = 0   # string ascending 
-    RDBQOSTRDESC = 1  # string descending 
-    RDBQONUMASC = 2   # number ascending 
-    RDBQONUMDESC = 3  # number descending 
+    RDBQOSTRASC = 0   # string ascending
+    RDBQOSTRDESC = 1  # string descending
+    RDBQONUMASC = 2   # number ascending
+    RDBQONUMDESC = 3  # number descending
 
     # Opts
     RDBMONOULOG = 1
@@ -181,7 +182,7 @@ class TyrantProtocol(object):
         'sstartswith': RDBQCSTRBW,
         'sendswith': RDBQCSTREW,
         'smatchregex': RDBQCSTRRX,
-        
+
         # Numbers conditions
         'neq': RDBQCNUMEQ,
         'ngt': RDBQCNUMGT,
@@ -226,8 +227,8 @@ class TyrantProtocol(object):
     def putnr(self, key, value):
         """Set key to value without waiting for a server response
         """
-        self._sock.send(self.PUTNR, _ulen(key), _ulen(value), key, value, 
-                         sync=False)
+        self._sock.send(self.PUTNR, _ulen(key), _ulen(value), key, value,
+                        sync=False)
 
     def out(self, key):
         """Remove key from server
@@ -295,7 +296,7 @@ class TyrantProtocol(object):
         """
         fracpart, intpart = math.modf(num)
         fracpart, intpart = int(fracpart * 1e12), int(intpart)
-        self._sock.send(self.ADDDOUBLE, _ulen(key), long(intpart), 
+        self._sock.send(self.ADDDOUBLE, _ulen(key), long(intpart),
                         long(fracpart), key)
         return self._sock.get_double()
 
@@ -351,7 +352,7 @@ class TyrantProtocol(object):
         self._sock.send(self.STAT)
         return self._sock.get_unicode()
 
-    def search(self, conditions, limit=10, offset=0, 
+    def search(self, conditions, limit=10, offset=0,
                order_type=0, order_field=None, opts=0):
         """Search table elements. args should be (field, opt, expr) tuple
         """
@@ -383,7 +384,6 @@ class TyrantProtocol(object):
             self._sock.send(self.MISC, len(func), opts, len(args), func, args)
         finally:
             numrecs = self._sock.get_int()
-        
-        return [self._sock.get_unicode() for i in xrange(numrecs)]
 
+        return [self._sock.get_unicode() for i in xrange(numrecs)]
 
