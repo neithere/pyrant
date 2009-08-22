@@ -110,15 +110,25 @@ class Model(object):
 
     # Python magic methods
 
-    def __init__(self, key=None, **kw):
+    def __init__(self, key=None, storage=None, **kw):
         if self.__class__ == Model:
             raise NotImplementedError('Model must be subclassed')
         self._meta.set_model_instance(self)
+        self._storage = storage
         self._key = key
+
+        ## FIXME Tyrant-/shelve-specific!
+        if self._storage and self._key and not kw:
+            kw = storage[self._key]
+        ##
+
         self._data = kw.copy() # store the original data intact, even if some of it is not be used
+
         for name in self._meta.prop_names:
             if name in kw:
-                setattr(self, name, kw.pop(name))
+                raw_value = kw.pop(name)
+                value = self._meta.props[name].to_python(raw_value)
+                setattr(self, name, value)
         #if kw:
         #    raise TypeError('"%s" is invalid keyword argument for model init.' % kw.keys()[0])
 
@@ -138,9 +148,11 @@ class Model(object):
         query = storage.query
 
         def _decorate_item(pk, data):
-            return cls(pk, **dict((str(k), v) for k, v in data.iteritems()))
+            return cls(key=pk, storage=storage,
+                       **dict((str(k), v) for k, v in data.iteritems()))
                                            #if k in cls._meta.prop_names))
-        query.decorate = _decorate_item
+        # FIXME make this more flexible or just rely on backend wrapper:
+        query._decorate = _decorate_item
 
         if cls._meta.must_have:
             return query.filter(**cls._meta.must_have)
@@ -157,9 +169,10 @@ class Model(object):
             ##
             data[name] = value
 
-        for name in self._meta.must_have.keys():
-            if name not in data:
-                data[name] = getattr(self, name)    # NOTE validation should be done using must_have constraints
+        if self._meta.must_have:
+            for name in self._meta.must_have.keys():
+                if name not in data:
+                    data[name] = getattr(self, name)    # NOTE validation should be done using must_have constraints
 
         ### FIXME Tyrant- or shelve-specific! a backend wrapper should be introduced.
         #         TODO check if this is a correct way of generating an autoincremented pk

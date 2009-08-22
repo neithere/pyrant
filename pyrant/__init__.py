@@ -352,7 +352,7 @@ class Query(object):
         self.literal = literal
 
     @staticmethod
-    def decorate(k, v):
+    def _decorate(k, v):
         return {k: v}
 
     def order(self, name):
@@ -470,12 +470,12 @@ class Query(object):
 
         # Since results are keys, we need to query for actual values
         if isinstance(k, slice):
-            ret = [self.decorate(key, _parse_elem(self._proto.get(key, self.literal),
-                                                  self._dbtype))
+            ret = [self._decorate(key, _parse_elem(self._proto.get(key, self.literal),
+                                                   self._dbtype))
                    for key in keys]
         else:
-            ret = self.decorate(keys[0], _parse_elem(self._proto.get(keys[0], self.literal),
-                                                     self._dbtype))
+            ret = self._decorate(keys[0], _parse_elem(self._proto.get(keys[0], self.literal),
+                                                      self._dbtype))
 
         self._cache[cache_key] = ret
 
