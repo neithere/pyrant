@@ -385,12 +385,12 @@ class Query(object):
         return self
 
     def exclude(self, *args, **kwargs):
-        return self._filter(negate=True, *args, **kwargs)
+        return self._filter(negate, args, kwargs)
 
     def filter(self, *args, **kwargs):
-        return self._filter(negate=False, *args, **kwargs)
+        return self._filter(negate, args, kwargs)
 
-    def _filter(self, negate, *args, **kwargs):
+    def _filter(self, negate, args, kwargs):
         """Add condition to query. This could be done by Q object or by keyword
         arguments. Keys are:
             __eq: Equals (default) to expression

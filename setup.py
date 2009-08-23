@@ -27,7 +27,7 @@ setup(
     description='A python wrapper around Tokyo Tyrant',
     author = 'Martin Conte Mac Donell',
     author_email = 'Reflejo@gmail.com',
-    packages = ['pyrant', 'pyrant.models'],
+    packages = ['pyrant'],
     install_requires = ['setuptools'],
     include_package_data = True,
     classifiers = [
