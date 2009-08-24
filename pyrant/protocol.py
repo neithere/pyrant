@@ -161,7 +161,14 @@ class TyrantProtocol(object):
     RDBQCNUMLE = 12   # number is less than or equal to
     RDBQCNUMBT = 13   # number is between two tokens of
     RDBQCNUMOREQ = 14 # number is equal to at least one token in
-    RDBQCNOIDX = 16   # no index flag
+    RDBQCFTSPH = 15
+    RDBQCFTSAND = 16
+    RDBQCFTSOR = 17
+    RDBQCFTSEX = 18
+
+
+    RDBQCNOIDX = 1 << 25   # no index flag
+
 
     RDBQCNEGATE = 1 << 24  # negation flag
 
@@ -194,7 +201,13 @@ class TyrantProtocol(object):
         # Multiple conditions
         'scontains_or': RDBQCSTROR,
         'seq_or': RDBQCSTROREQ,
-        'neq_or': RDBQCNUMOREQ
+        'neq_or': RDBQCNUMOREQ,
+        
+        # Full text searhc
+        'slike': RDBQCFTSPH,
+        'slike_all': RDBQCFTSAND,
+        'slike_any': RDBQCFTSOR,
+
     }
 
     def __init__(self, host, port):
