@@ -45,7 +45,10 @@ def _pack(code, *args):
 
         elif isinstance(arg, (list, tuple)):
             for v in arg:
-                v = str(v)
+                if isinstance(v, unicode):
+                    v = v.encode(ENCODING)
+                else:
+                    v = str(v)
                 buf += "%s%s" % (struct.pack(">I", len(v)), v)
 
     return "%s%s" % (struct.pack(fmt, MAGIC_NUMBER, code, *largs), buf)
