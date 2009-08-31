@@ -353,7 +353,7 @@ class Query(object):
 
     @staticmethod
     def _decorate(k, v):
-        return {k: v}
+        return (k, v)
 
     def order(self, name):
         """Define result order. name parameter is the column name.
@@ -431,6 +431,23 @@ class Query(object):
             self._conditions.append(Q(negate=negate, **{name: expr}))
 
         return self
+
+    def values(self, key):
+        "Returns a list of unique values for given key."
+        collected = {}
+        for _, data in self[:]:
+            for k,v in data.iteritems():
+                if k == key and v not in collected:
+                    collected[v] = 1
+        return collected.keys()
+
+    def stat(self):
+        "Returns statistics on key usage."
+        collected = {}
+        for _, data in self[:]:
+            for k in data:
+                collected[k] = collected.setdefault(k, 0) + 1
+        return collected
 
     def __len__(self):
         return len(self[:])
