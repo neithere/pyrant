@@ -15,7 +15,7 @@ More information about Tokyo Tyrant:
 This is an usage example:
 
     >>> import pyrant
-    >>> t = pyrant.Tyrant(host='127.0.0.1', port=1978)
+    >>> t = pyrant.Tyrant(host='127.0.0.1', port=1983)    # default port is 1978
     >>> if t.dbtype != pyrant.DBTYPETABLE:
     ...     t['key'] = 'foo'
     ...     print t['key']
@@ -31,11 +31,14 @@ This is an usage example:
 
 """
 
+import copy
 import itertools as _itertools
 from protocol import TyrantProtocol, TyrantError
 
-__version__ = '0.0.2'
+
+__version__ = '0.0.3'
 __all__ = ['Tyrant', 'TyrantError', 'TyrantProtocol', 'Q']
+
 
 # Constants
 DEFAULT_HOST = '127.0.0.1'
@@ -109,15 +112,7 @@ class Tyrant(dict):
             raise KeyError(key)
 
     def get(self, key, default=None):
-        """Allow for getting with a default.
-
-           >>> t = Tyrant()
-           >>> t['foo'] = {'a': 'z', 'b': 'y'}
-           >>> print t.get('foo', {})
-           {u'a': u'z', u'b': u'y'}
-           >>> print t.get('bar', {})
-           {}
-
+        """Allow for getting with a default value.
         """
         try:
             return self[key]
@@ -261,33 +256,17 @@ class Tyrant(dict):
         """Synchronize updated content into database"""
         self.proto.sync()
 
-    def _get_query(self):
+    @property
+    def query(self):
         return Query(self.proto, self.dbtype, self.literal)
-
-    query = property(_get_query)
 
 
 class Q(object):
     """Condition object. You can | this type to ORs conditions,
-    but you cannot use operand "&", to do this just add more Q to your filter
-    Example:
-
-        >>> t = Tyrant()
-        >>> t.clear()
-        >>> t.dbtype == pyrant.DBTYPETABLE
-        True
-        >>> t['i'] = {'name': 'Reflejo', 'test': 0}
-        >>> t['you'] = {'name': 'Fulano', 'test': 1}
-        >>> res = t.query.filter(Q(name='Reflejo'), Q(test=0))
-        >>> res[0]['i']['name']
-        u'Reflejo'
-        >>> res = t.query.filter(Q(name='Reflejo') | Q(name='Fulano'))
-        >>> len(res)
-        2
-
+    but you cannot use operand "&", to do this just add more Q to your filter.
     """
 
-    def __init__(self, negate=False, **kwargs):
+    def __init__(self, **kwargs):
         assert kwargs, "You need to specify at least one condition"
 
         for kw, val in kwargs.iteritems():
@@ -296,15 +275,15 @@ class Q(object):
             self._op += nameop[1] if len(nameop) > 1 else 'eq'
             self.name = nameop[0]
             self.expr = val
-            self.negate = negate
+
+        self.negate = False
 
     def __or__(self, q):
-        import copy
         assert isinstance(q, Q), "Unsupported operand type(s) for |"
 
         op = '%s_or' % q._op
         if q._op == self._op and op in TyrantProtocol.conditionsmap:
-            qcopy = copy.copy(q)
+            qcopy = q._clone()
             qcopy._op = op
             qcopy.expr = "%s,%s" % (q.expr , self.expr)
 
@@ -313,43 +292,41 @@ class Q(object):
             raise TypeError("Unsoported operand for |. You can only do this "\
                             "on contains or eq")
 
-    def _getop(self):
+    @property
+    def op(self):
         op = TyrantProtocol.conditionsmap[self._op]
         return op | TyrantProtocol.RDBQCNEGATE if self.negate else op
 
-    op = property(_getop)
-
     def __repr__(self):
         return "%s [%s] %s" % (self.name, self.op, self.expr)
+
+    def _clone(self):
+        return copy.copy(self)
 
 
 class Query(object):
     """Query table operations. This is a lazy object
     that abstract all queries for tyrant protocol.
-
-    Usage:
-
-    # Insert object into database
-    >>> t = Tyrant()
-    >>> t.dbtype == pyrant.DBTYPETABLE
-    True
-    >>> t['i'] = {'name': 'Reflejo', 'test': 0}
-
-    # Now let's see if we can reach it querying tyrant
-    >>> res = t.query.filter(name='Reflejo', test=0).order('name')
-    >>> print res[0]['i']['name']
-    Reflejo
-
     """
 
-    def __init__(self, proto, dbtype, literal=False):
-        self._conditions = []
+    def __init__(self, proto, dbtype, literal=False, conditions=None):
+        if conditions:
+            assert isinstance(conditions, list) and \
+                   all(isinstance(c,Q) for c in conditions), \
+                   'Expected a list of Q instances, got %s' % conditions
+        self._conditions = conditions or []
         self._order = None
         self._order_t = 0
         self._cache = {}
         self._proto = proto
         self._dbtype = dbtype
         self.literal = literal
+
+    def _clone(self):
+        conditions = [q._clone() for q in self._conditions]
+        query = Query(self._proto, self._dbtype, literal=self.literal,
+                      conditions=conditions)
+        return query
 
     @staticmethod
     def _decorate(k, v):
@@ -368,21 +345,23 @@ class Query(object):
         """
         if name.startswith('-'):
             if name.startswith('-#'):
-                order = (name[2:], TyrantProtocol.RDBQONUMDESC)
+                order, order_t = name[2:], TyrantProtocol.RDBQONUMDESC
             else:
-                order = (name[1:], TyrantProtocol.RDBQOSTRDESC)
+                order, order_t = name[1:], TyrantProtocol.RDBQOSTRDESC
         elif name.startswith('#'):
-            order = (name[1:], TyrantProtocol.RDBQONUMASC)
+            order, order_t = name[1:], TyrantProtocol.RDBQONUMASC
         else:
-            order = (name, TyrantProtocol.RDBQOSTRASC)
+            order, order_t = name, TyrantProtocol.RDBQOSTRASC
 
-        if self._order != order[0] or self._order_t != order[1]:
-            # Add another rule means that our naive cache should be empty'ed
-            self._cache = {}
-            self._order = order[0]
-            self._order_t = order[1]
+        query = self._clone()
 
-        return self
+        if self._order == order and self._order_t == order_t:
+            # provide link to existing cache
+            query._cache = self._cache
+        query._order = order
+        query._order_t = order_t
+
+        return query
 
     def exclude(self, *args, **kwargs):
         return self._filter(True, args, kwargs)
@@ -415,22 +394,22 @@ class Query(object):
 
         """
 
-        # FIXME this changes current Query object, not clones it!!!
-
-        # Add another rule means that our naive cache should be empty'ed
-        self._cache = {}
+        query = self._clone()
 
         # Iterate arguments. Should be instances of Q
-        for q in args:
-            assert isinstance(q, Q), "Arguments must be instances of Q"
-            q.negate = not q.negate
-            self._conditions.append(q)
+        for cond in args:
+            assert isinstance(cond, Q), "Arguments must be instances of Q"
+            q = cond._clone()
+            q.negate = q.negate ^ negate
+            query._conditions.append(q)
 
         # Generate Q with arguments as needed
         for name, expr in kwargs.iteritems():
-            self._conditions.append(Q(negate=negate, **{name: expr}))
+            q = Q(**{name: expr})
+            q.negate = negate
+            query._conditions.append(q)
 
-        return self
+        return query
 
     def values(self, key):
         "Returns a list of unique values for given key."
