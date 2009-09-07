@@ -13,6 +13,7 @@ Contents:
 
    pyrant
    protocol
+   query
 
 Indices and tables
 ==================

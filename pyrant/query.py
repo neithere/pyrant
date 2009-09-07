@@ -14,7 +14,8 @@ MAX_RESULTS = 1000
 
 class Q(object):
     """Condition object. You can | this type to ORs conditions,
-    but you cannot use operand "&", to do this just add more Q to your filter.
+    but you cannot use operand "&", to do this just add more :class:`~pyrant.Q`s
+    to your :meth:`~pyrant.Query.filter`.
     """
     # TODO: write better documentation: provide example code
 
@@ -142,7 +143,8 @@ class Query(object):
     def filter(self, *args, **kwargs):    # TODO: provide full list of lookups
         """Returns a clone of the Query object with given conditions applied.
 
-        Conditions can be specified as Q objects and/or keyword arguments.
+        Conditions can be specified as :class:`~pyrant.Q` objects and/or
+        keyword arguments.
 
         Supported keyword lookups are:
 
