@@ -77,7 +77,7 @@ class TestTyrant(object):
     """
     def basic_usage(self):
         """
-        >>> if t.dbtype != pyrant.DBTYPETABLE:
+        >>> if t.dbtype != pyrant.protocol.DB_TABLE:
         ...     t['key'] = 'foo'
         ...     print t['key']
         ... else:
@@ -107,7 +107,7 @@ class TestTable(TestTyrant):
     """
     # Table extension for Tyrant
 
-    >>> t.dbtype == pyrant.DBTYPETABLE
+    >>> t.dbtype == pyrant.protocol.DB_TABLE
     True
 
     """

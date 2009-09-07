@@ -8,14 +8,18 @@ import math
 import socket
 import struct
 
-class TyrantError(Exception):
-    """
-    Tyrant error, socket and communication errors are not included here.
-    """
+from exceptions import TyrantError
 
-# pyrant constants
+
+# Pyrant constants
 MAGIC_NUMBER = 0xc8
 ENCODING = 'UTF-8'
+
+# Table Types
+DB_BTREE  = 'B+ tree'
+DB_TABLE  = 'table'
+DB_MEMORY = 'on-memory hash'
+DB_HASH   = 'hash'
 
 
 def _ulen(expr):
@@ -222,6 +226,7 @@ class TyrantProtocol(object):
         'slike_any': RDBQCFTSOR,
 
     }
+
 
     def __init__(self, host, port):
         self._sock = _TyrantSocket(host, port)
