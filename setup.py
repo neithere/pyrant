@@ -18,10 +18,11 @@ The setup and build script for the pyrant library.
 """
 
 from setuptools import setup
+import pyrant
 
 setup(
     name = "pyrant",
-    version = "0.0.4",
+    version = pyrant.__version__,
     url = 'http://code.google.com/p/pyrant/',
     license = 'Apache License 2.0',
     description='A python wrapper around Tokyo Tyrant',

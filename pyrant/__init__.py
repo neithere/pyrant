@@ -1,10 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-A pythonic python-only implementation of Tokyo Tyrant protocol.
-Python 2.4+ is needed.
-
-This library takes a "pythonic" approach to make it more clear and easy
-to implement.
+A pure-Python implementation of Tokyo Tyrant protocol.
+Python 2.4+ is required.
 
 More information about Tokyo Cabinet:
     http://tokyocabinet.sourceforge.net/
@@ -12,7 +9,7 @@ More information about Tokyo Cabinet:
 More information about Tokyo Tyrant:
     http://tokyocabinet.sourceforge.net/tyrantdoc/
 
-This is an usage example:
+Usage example (note the automatically managed support for table database)::
 
     >>> import pyrant
     >>> t = pyrant.Tyrant(host='127.0.0.1', port=1983)    # default port is 1978
@@ -36,7 +33,7 @@ import itertools as _itertools
 from protocol import TyrantProtocol, TyrantError
 
 
-__version__ = '0.0.3'
+__version__ = '0.1.0'
 __all__ = ['Tyrant', 'TyrantError', 'TyrantProtocol', 'Q']
 
 
@@ -68,20 +65,18 @@ def _parse_elem(elem, dbtype, sep=None):
 
 
 class Tyrant(dict):
-    """Main class of Tyrant implementation. Acts like a python dictionary,
-    so you can query object using normal subscript operations.
+    """A Python dictionary API for Tokyo Tyrant.
+
+    :param host: Tyrant host address
+    :param port: Tyrant port number
+    :param separator: if set, will be used to get/put lists as values
+    :param literal: if set, returned data is not encoded to Unicode
     """
 
     def __init__(self, host=DEFAULT_HOST, port=DEFAULT_PORT, separator=None,
                  literal=False):
         """
-        Acts like a python dictionary. Params are:
-
-        host: Tyrant Host address
-        port: Tyrant port number
-        separator: If this parameter is set, you can put and get lists as
-        values.
-        literal: If is set string is returned instead of unicode
+        Acts like a python dictionary.
         """
         # We want to make protocol public just in case anyone need any
         # specific option
@@ -112,8 +107,7 @@ class Tyrant(dict):
             raise KeyError(key)
 
     def get(self, key, default=None):
-        """Allow for getting with a default value.
-        """
+        """Returns value for `key`. If no record is found, returns `default`."""
         try:
             return self[key]
         except KeyError:
@@ -142,40 +136,38 @@ class Tyrant(dict):
 
     def call_func(self, func, key, value, record_locking=False,
                   global_locking=False):
-        """Call specific function.
-        """
+        """Calls specific function."""
+        # TODO: write better documentation *OR* move this method to lower level
         opts = ((record_locking and TyrantProtocol.RDBXOLCKREC) |
                 (global_locking and TyrantProtocol.RDBXOLCKGLB))
         return self.proto.ext(func, opts, key, value)
 
     def clear(self):
-        """Used in order to remove all records of a remote database object"""
+        """Removes all records from the remote database."""
         self.proto.vanish()
 
     def concat(self, key, value, width=None):
-        """Concatenate columns of the existing record"""
+        """Concatenates columns of the existing record."""
+        # TODO: write better documentation, provide example code
         if width is None:
             self.proto.putcat(key, value)
         else:
             self.proto.putshl(key, value, width)
 
     def get_size(self, key):
-        """Get the size of the value of a record"""
+        """Returns the size of the value for `key`."""
         try:
             return self.proto.vsiz(key)
         except TyrantError:
             raise KeyError(key)
 
     def get_stats(self):
-        """Get the status string of the database.
-        The return value is the status message of the database.The message
-        format is a dictionary.
-        """
+        """Returns the status message of the database as dictionary."""
         return dict(l.split('\t', 1) \
                         for l in self.proto.stat().splitlines() if l)
 
     def iterkeys(self):
-        """Iterate keys using remote operations"""
+        """Iterates keys using remote operations."""
         self.proto.iterinit()
         try:
             while True:
@@ -184,17 +176,19 @@ class Tyrant(dict):
             pass
 
     def keys(self):
-        """Return the list of keys in database"""
+        """Returns the list of keys in the database."""
         return list(self.iterkeys())
 
     def update(self, other, **kwargs):
-        """Update/Add given objects into database"""
+        """Updates/s given objects into the database."""
+        # TODO: write better documentation, provide example code
         self.multi_set(other.iteritems())
         if kwargs:
             self.update(kwargs)
 
     def multi_del(self, keys, no_update_log=False):
-        """Remove given records from database"""
+        """Removes given records from the database."""
+        # TODO: write better documentation: why would user need the no_update_log param?
         opts = (no_update_log and TyrantProtocol.RDBMONOULOG or 0)
         if not isinstance(keys, (list, tuple)):
             keys = list(keys)
@@ -202,7 +196,7 @@ class Tyrant(dict):
         self.proto.misc("outlist", keys, opts)
 
     def multi_get(self, keys, no_update_log=False):
-        """Returns a list of records that match given keys"""
+        """Returns a list of records that match given keys."""
         opts = (no_update_log and TyrantProtocol.RDBMONOULOG or 0)
         if not isinstance(keys, (list, tuple)):
             keys = list(keys)
@@ -223,7 +217,7 @@ class Tyrant(dict):
         return d
 
     def multi_set(self, items, no_update_log=False):
-        """Store given records into database"""
+        """Stores given records in the database."""
         opts = (no_update_log and TyrantProtocol.RDBMONOULOG or 0)
         lst = []
         for k, v in items.iteritems():
@@ -235,29 +229,24 @@ class Tyrant(dict):
 
         self.proto.misc("putlist", lst, opts)
 
-    def get_int(self, key):
-        """Get an integer for given key. Must been added by addint"""
-        return self.proto.getint(key)
-
-    def get_double(self, key):
-        """Get a double for given key. Must been added by adddouble"""
-        return self.proto.getdouble(key)
-
     def prefix_keys(self, prefix, maxkeys=None):
         """Get forward matching keys in a database.
         The return value is a list object of the corresponding keys.
         """
+        # TODO: write better documentation: describe purpose, provide example code
         if maxkeys is None:
             maxkeys = len(self)
 
         return self.proto.fwmkeys(prefix, maxkeys)
 
     def sync(self):
-        """Synchronize updated content into database"""
+        """Synchronizes updated content with the database."""
+        # TODO: write better documentation: when would user need this?
         self.proto.sync()
 
     @property
     def query(self):
+        """Returns a :class:`~pyrant.Query` object for the database."""
         return Query(self.proto, self.dbtype, self.literal)
 
 
@@ -265,6 +254,7 @@ class Q(object):
     """Condition object. You can | this type to ORs conditions,
     but you cannot use operand "&", to do this just add more Q to your filter.
     """
+    # TODO: write better documentation: provide example code
 
     def __init__(self, **kwargs):
         assert kwargs, "You need to specify at least one condition"
@@ -333,14 +323,17 @@ class Query(object):
         return (k, v)
 
     def order(self, name):
-        """Define result order. name parameter is the column name.
-        You can prefix "-" to order desc.
-        If "#" is added just before column name, column are ordered as numbers
+        """Defines order in which results should be retrieved.
 
-        Examples:
-            order('-name')
-            order('-#ranking')
-            order('name')
+        :param name: the column name. If prefixed with ``-``, direction is changed
+            from ascending (default) to descending.
+            If prefixed with ``#``, values are treated as numbers.
+
+        Examples::
+
+            q.order('name')       # ascending
+            q.order('-name')      # descending
+            q.order('-#ranking')  # descending, numeric
 
         """
         if name.startswith('-'):
@@ -364,36 +357,59 @@ class Query(object):
         return query
 
     def exclude(self, *args, **kwargs):
+        """Antipode of :meth:`~pyrant.Query.filter`."""
         return self._filter(True, args, kwargs)
 
-    def filter(self, *args, **kwargs):
-        return self._filter(False, args, kwargs)
+    def filter(self, *args, **kwargs):    # TODO: provide full list of lookups
+        """Returns a clone of the Query object with given conditions applied.
 
-    def _filter(self, negate, args, kwargs):
-        """Add condition to query. This could be done by Q object or by keyword
-        arguments. Keys are:
-            __eq: Equals (default) to expression
-            __lt: Less than expression
-            __le: Less or equal to expression
-            __gt: Greater than expression
-            __ge: Greater or equal to expression
+        Conditions can be specified as Q objects and/or keyword arguments.
 
-        Example:
+        Supported keyword lookups are:
+
+            * __eq: Equals (default) to expression
+            * __lt: Less than expression
+            * __le: Less or equal to expression
+            * __gt: Greater than expression
+            * __ge: Greater or equal to expression
+
+        Usage:
+
+            connect to a remote table database:
+
             >>> t = Tyrant()
             >>> t.get_stats()['type']
             u'table'
-            >>> t['i'] = {'name': 'Reflejo', 'test': 4}
-            >>> t['i2'] = {'name': 'Reflejo', 'test': 4}
-            >>> t['i3'] = {'name': 'Reflejo', 'test': 4}
 
-            >>> res = t.query.filter(test__gt=0)[:1]
-            >>> len(res) == 1
-            True
-            >>> print res[0]['i']['name']
-            Reflejo
+            stuff some data into the storage:
+
+            >>> t['a'] = {'name': 'Foo', 'price': 1}
+            >>> t['b'] = {'name': 'Bar', 'price': 2}
+            >>> t['c'] = {'name': 'Foo', 'price': 3}
+
+            find everything with price > 1:
+
+            >>> [x[0] for x in t.query.filter(price__gt=1)]
+            ['b', 'c']
+
+            find everything with name "Foo":
+
+            >>> [x[0] for x in t.query.filter(name='Foo')]
+            ['a', 'c']
+
+            chain queries:
+
+            >>> cheap_items = t.query.filter(price__lt=3)
+            >>> cheap_bars = cheap_items.filter(name='Bar')
+            >>> [x[0] for x in cheap_items]
+            ['a', 'b']
+            >>> [x[0] for x in cheap_bars]
+            ['b']
 
         """
+        return self._filter(False, args, kwargs)
 
+    def _filter(self, negate, args, kwargs):
         query = self._clone()
 
         # Iterate arguments. Should be instances of Q

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
-Protocol implementation for Tyrant
-<http://tokyocabinet.sourceforge.net/tyrantdoc/>
+Protocol implementation for `Tokyo Tyrant
+<http://tokyocabinet.sourceforge.net/tyrantdoc/>`_.
 """
 
 import math
@@ -123,68 +123,78 @@ class TyrantProtocol(object):
     """
 
     # Protocol commands
-    PUT = 0x10
-    PUTKEEP = 0x11
-    PUTCAT = 0x12
-    PUTSHL = 0x13
-    PUTNR = 0x18
-    OUT = 0x20
-    GET = 0x30
-    MGET = 0x31
-    VSIZ = 0x38
-    ITERINIT = 0x50
-    ITERNEXT = 0x51
-    FWMKEYS = 0x58
-    ADDINT = 0x60
+
+    PUT       = 0x10
+    PUTKEEP   = 0x11
+    PUTCAT    = 0x12
+    PUTSHL    = 0x13
+    PUTNR     = 0x18
+    OUT       = 0x20
+    GET       = 0x30
+    MGET      = 0x31
+    VSIZ      = 0x38
+    ITERINIT  = 0x50
+    ITERNEXT  = 0x51
+    FWMKEYS   = 0x58
+    ADDINT    = 0x60
     ADDDOUBLE = 0x61
-    EXT = 0x68
-    SYNC = 0x70
-    VANISH = 0x72
-    COPY = 0x73
-    RESTORE = 0x74
-    SETMST = 0x78
-    RNUM = 0x80
-    SIZE = 0x81
-    STAT = 0x88
-    MISC = 0x90
+    EXT       = 0x68
+    SYNC      = 0x70
+    VANISH    = 0x72
+    COPY      = 0x73
+    RESTORE   = 0x74
+    SETMST    = 0x78
+    RNUM      = 0x80
+    SIZE      = 0x81
+    STAT      = 0x88
+    MISC      = 0x90
 
     # Query conditions
-    RDBQCSTREQ = 0    # string is equal to
-    RDBQCSTRINC = 1   # string is included in
-    RDBQCSTRBW = 2    # string begins with
-    RDBQCSTREW = 3    # string ends with
-    RDBQCSTRAND = 4   # string includes all tokens in
-    RDBQCSTROR = 5    # string includes at least one token in
-    RDBQCSTROREQ = 6  # string is equal to at least one token in
-    RDBQCSTRRX = 7    # string matches regular expressions of
-    RDBQCNUMEQ = 8    # number is equal to
-    RDBQCNUMGT = 9    # number is greater than
-    RDBQCNUMGE = 10   # number is greater than or equal to
-    RDBQCNUMLT = 11   # number is less than
-    RDBQCNUMLE = 12   # number is less than or equal to
-    RDBQCNUMBT = 13   # number is between two tokens of
-    RDBQCNUMOREQ = 14 # number is equal to at least one token in
-    RDBQCFTSPH = 15
-    RDBQCFTSAND = 16
-    RDBQCFTSOR = 17
-    RDBQCFTSEX = 18
 
+    RDBQCSTREQ   = 0     # string is equal to
+    RDBQCSTRINC  = 1     # string is included in
+    RDBQCSTRBW   = 2     # string begins with
+    RDBQCSTREW   = 3     # string ends with
+    RDBQCSTRAND  = 4     # string includes all tokens in
+    RDBQCSTROR   = 5     # string includes at least one token in
+    RDBQCSTROREQ = 6     # string is equal to at least one token in
+    RDBQCSTRRX   = 7     # string matches regular expressions of
+    RDBQCNUMEQ   = 8     # number is equal to
+    RDBQCNUMGT   = 9     # number is greater than
+    RDBQCNUMGE   = 10    # number is greater than or equal to
+    RDBQCNUMLT   = 11    # number is less than
+    RDBQCNUMLE   = 12    # number is less than or equal to
+    RDBQCNUMBT   = 13    # number is between two tokens of
+    RDBQCNUMOREQ = 14    # number is equal to at least one token in
+    RDBQCFTSPH   = 15    # full-text search with the phrase of
+    RDBQCFTSAND  = 16    # full-text search with all tokens in
+    RDBQCFTSOR   = 17    # full-text search with at least one token in
+    RDBQCFTSEX   = 18    # full-text search with the compound expression of
 
-    RDBQCNOIDX = 1 << 25   # no index flag
+    RDBQCNEGATE  = 1 << 24    # negation flag
+    RDBQCNOIDX   = 1 << 25    # no index flag
 
+    # Order types
 
-    RDBQCNEGATE = 1 << 24  # negation flag
+    RDBQOSTRASC  = 0    # string ascending
+    RDBQOSTRDESC = 1    # string descending
+    RDBQONUMASC  = 2    # number ascending
+    RDBQONUMDESC = 3    # number descending
 
-    # Order
-    RDBQOSTRASC = 0   # string ascending
-    RDBQOSTRDESC = 1  # string descending
-    RDBQONUMASC = 2   # number ascending
-    RDBQONUMDESC = 3  # number descending
+    # Operation types
 
-    # Opts
-    RDBMONOULOG = 1
-    RDBXOLCKREC = 1
-    RDBXOLCKGLB = 2
+    TDBMSUNION = 1    # union
+    TDBMSISECT = 2    # intersection
+    TDBMSDIFF  = 3    # difference
+
+    # Miscellaneous operation options
+
+    RDBMONOULOG = 1    # omission of update log
+
+    # Scripting extension options
+
+    RDBXOLCKREC = 1    # record locking
+    RDBXOLCKGLB = 2    # global locking
 
     conditionsmap = {
         # String conditions
@@ -205,8 +215,8 @@ class TyrantProtocol(object):
         'scontains_or': RDBQCSTROR,
         'seq_or': RDBQCSTROREQ,
         'neq_or': RDBQCNUMOREQ,
-        
-        # Full text searhc
+
+        # Full text search
         'slike': RDBQCFTSPH,
         'slike_all': RDBQCFTSAND,
         'slike_any': RDBQCFTSOR,
@@ -217,23 +227,23 @@ class TyrantProtocol(object):
         self._sock = _TyrantSocket(host, port)
 
     def put(self, key, value):
-        """Unconditionally set key to value
+        """Unconditionally sets key to value.
         """
         self._sock.send(self.PUT, _ulen(key), _ulen(value), key, value)
 
     def putkeep(self, key, value):
-        """Set key to value if key does not already exist
+        """Sets key to value if key does not already exist.
         """
         self._sock.send(self.PUTKEEP, _ulen(key), _ulen(value), key, value)
 
     def putcat(self, key, value):
-        """Append value to the existing value for key, or set key to
-        value if it does not already exist
+        """Appends value to the existing value for key, or sets key to
+        value if it does not already exist.
         """
         self._sock.send(self.PUTCAT, _ulen(key), _ulen(value), key, value)
 
     def putshl(self, key, value, width):
-        """Equivalent to::
+        """Equivalent to:
 
             self.putcat(key, value)
             self.put(key, self.get(key)[-width:])
@@ -242,55 +252,60 @@ class TyrantProtocol(object):
                         value)
 
     def putnr(self, key, value):
-        """Set key to value without waiting for a server response
+        """Sets key to value without waiting for a server response.
         """
         self._sock.send(self.PUTNR, _ulen(key), _ulen(value), key, value,
                         sync=False)
 
     def out(self, key):
-        """Remove key from server
+        """Removes key from server.
         """
         self._sock.send(self.OUT, _ulen(key), key)
 
     def get(self, key, literal=False):
-        """Get the value of a key from the server
+        """Returns the value of `key` as stored on the server.
         """
         self._sock.send(self.GET, _ulen(key), key)
         return self._sock.get_str() if literal else self._sock.get_unicode()
 
     def getint(self, key):
-        """Get an integer for given key. Must been added by addint"""
+        """Returns an integer for given `key`. Value must be set by
+        :meth:`~pyrant.protocol.TyrantProtocol.addint`.
+        """
         self._sock.send(self.GET, _ulen(key), key)
         val = self._sock.get_str()
         return struct.unpack('I', val)[0]
 
     def getdouble(self, key):
-        """Get a double for given key. Must been added by adddouble"""
+        """Returns a double for given key. Value must be set by
+        :meth:`~pyrant.protocol.TyrantProtocol.adddouble`.
+        """
         self._sock.send(self.GET, _ulen(key), key)
         val = self._sock.get_str()
         intpart, fracpart = struct.unpack('>QQ', val)
         return intpart + (fracpart * 1e-12)
 
     def mget(self, klst):
-        """Get key,value pairs from the server for the given list of keys
+        """Returns key,value pairs from the server for the given list of keys.
         """
         self._sock.send(self.MGET, len(klst), klst)
         numrecs = self._sock.get_int()
         return [self._sock.get_strpair() for i in xrange(numrecs)]
 
     def vsiz(self, key):
-        """Get the size of a value for key
+        """Returns the size of a value for given key.
         """
         self._sock.send(self.VSIZ, _ulen(key), key)
         return self._sock.get_int()
 
     def iterinit(self):
-        """Begin iteration over all keys of the database
+        """Begins iteration over all keys of the database.
         """
         self._sock.send(self.ITERINIT)
 
     def iternext(self):
-        """Get the next key after iterinit
+        """Returns the next key after ``iterinit`` call. Raises
+        :class:`~pyrant.protocol.TyrantError` on iteration end.
         """
         self._sock.send(self.ITERNEXT)
         return self._sock.get_unicode()
@@ -303,13 +318,13 @@ class TyrantProtocol(object):
         return [self._sock.get_unicode() for i in xrange(numkeys)]
 
     def addint(self, key, num):
-        """Sum given integer to existing one
+        """Adds given integer to existing one. Stores and returns the sum.
         """
         self._sock.send(self.ADDINT, _ulen(key), num, key)
         return self._sock.get_int()
 
     def adddouble(self, key, num):
-        """Sum given double to existing one
+        """Adds given double to existing one. Stores and returns the sum.
         """
         fracpart, intpart = math.modf(num)
         fracpart, intpart = int(fracpart * 1e12), int(intpart)
@@ -318,60 +333,63 @@ class TyrantProtocol(object):
         return self._sock.get_double()
 
     def ext(self, func, opts, key, value):
-        """Call func(key, value) with opts
+        """Calls ``func(key, value)`` with ``opts``.
 
-        opts is a bitflag that can be RDBXOLCKREC for record locking
-        and/or RDBXOLCKGLB for global locking"""
+        :param opts: a bitflag that can be `RDBXOLCKREC` for record locking
+            and/or `RDBXOLCKGLB` for global locking.
+        """
         self._sock.send(self.EXT, len(func), opts, _ulen(key), _ulen(value),
                         func, key, value)
         return self._sock.get_unicode()
 
     def sync(self):
-        """Synchronize the database
+        """Synchronizes the database.
         """
         self._sock.send(self.SYNC)
 
     def vanish(self):
-        """Remove all records
+        """Removes all records from the database.
         """
         self._sock.send(self.VANISH)
 
     def copy(self, path):
-        """Hot-copy the database to path
+        """Hot-copies the database to given path.
         """
         self._sock.send(self.COPY, _ulen(path), path)
 
     def restore(self, path, msec):
-        """Restore the database from path at timestamp (in msec)
+        """Restores the database from `path` at given timestamp (in `msec`).
         """
         self._sock.send(self.RESTORE, _ulen(path), msec, path)
 
     def setmst(self, host, port):
-        """Set master to host:port
+        """Sets master to `host`:`port`.
         """
         self._sock.send(self.SETMST, len(host), port, host)
 
     def rnum(self):
-        """Get the number of records in the database
+        """Returns the number of records in the database.
         """
         self._sock.send(self.RNUM)
         return self._sock.get_long()
 
     def size(self):
-        """Get the size of the database
+        """Returns the size of the database.
         """
         self._sock.send(self.SIZE)
         return self._sock.get_long()
 
     def stat(self):
-        """Get some statistics about the database
+        """Returns some statistics about the database.
         """
         self._sock.send(self.STAT)
         return self._sock.get_unicode()
 
     def search(self, conditions, limit=10, offset=0,
                order_type=0, order_field=None, opts=0):
-        """Search table elements. args should be (field, opt, expr) tuple
+        """Searches table elements.
+
+        :param conditions: a list of tuples in the form ``(field, opt, expr)``
         """
         args = ["addcond\x00%s\x00%d\x00%s" % cond for cond in conditions]
 
@@ -386,16 +404,28 @@ class TyrantProtocol(object):
         return self.misc('search', args, opts)
 
     def misc(self, func, args, opts=0):
-        """All databases support "putlist", "outlist", and "getlist".
-        "putlist" is to store records. It receives keys and values one after
-        the other, and returns an empty list.
-        "outlist" is to remove records. It receives keys, and returns an empty
-        list.
-        "getlist" is to retrieve records. It receives keys, and returns values
+        """Executes custom function.
 
-        Table database supports "setindex", "search", "genuid".
-        opts is a bitflag that can be:
-            RDBMONOULOG to prevent writing to the update log
+        :param func: the function name (see below)
+        :param opts: a bitflag (see below)
+
+        Functions supported by all databases:
+
+        * `putlist` stores records. It receives keys and values one after
+          the other, and returns an empty list.
+        * `outlist` removes records. It receives keys, and returns
+          an empty list.
+        * `getlist` retrieves records. It receives keys, and returns values.
+
+        Functions supported by the table database (in addition to mentioned above):
+
+        * `setindex`
+        * `search`
+        * `genuid`.
+
+        Possible options:
+
+        * :const:`TyrantProtocol.RDBMONOULOG` to prevent writing to the update log.
         """
         try:
             self._sock.send(self.MISC, len(func), opts, len(args), func, args)
