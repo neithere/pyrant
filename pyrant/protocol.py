@@ -277,18 +277,13 @@ class TyrantProtocol(object):
         """Returns an integer for given `key`. Value must be set by
         :meth:`~pyrant.protocol.TyrantProtocol.addint`.
         """
-        self._sock.send(self.GET, _ulen(key), key)
-        val = self._sock.get_str()
-        return struct.unpack('I', val)[0]
+        return self.addint(key)
 
     def getdouble(self, key):
         """Returns a double for given key. Value must be set by
         :meth:`~pyrant.protocol.TyrantProtocol.adddouble`.
         """
-        self._sock.send(self.GET, _ulen(key), key)
-        val = self._sock.get_str()
-        intpart, fracpart = struct.unpack('>QQ', val)
-        return intpart + (fracpart * 1e-12)
+        return self.adddouble(key)
 
     def mget(self, klst):
         """Returns key,value pairs from the server for the given list of keys.
@@ -315,20 +310,20 @@ class TyrantProtocol(object):
         self._sock.send(self.ITERNEXT)
         return self._sock.get_unicode()
 
-    def fwmkeys(self, prefix, maxkeys):
+    def fwmkeys(self, prefix, maxkeys=-1):
         """Get up to the first maxkeys starting with prefix
         """
         self._sock.send(self.FWMKEYS, _ulen(prefix), maxkeys, prefix)
         numkeys = self._sock.get_int()
         return [self._sock.get_unicode() for i in xrange(numkeys)]
 
-    def addint(self, key, num):
+    def addint(self, key, num=0):
         """Adds given integer to existing one. Stores and returns the sum.
         """
         self._sock.send(self.ADDINT, _ulen(key), num, key)
         return self._sock.get_int()
 
-    def adddouble(self, key, num):
+    def adddouble(self, key, num=0.0):
         """Adds given double to existing one. Stores and returns the sum.
         """
         fracpart, intpart = math.modf(num)

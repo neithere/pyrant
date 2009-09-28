@@ -122,10 +122,10 @@ class TestProtocol(unittest.TestCase):
             def inner():
                 return self.p.getint(key)
             return inner
-        self.assertRaises(Exception, getint("fox")) #Is not a integer
-        self.assertRaises(TyrantError, getint("lala")) #Don't exists
+        assert getint("fox")() == 0 #Is not a integer. Becomes setted to 0
+        assert getint("lala")() == 0 #Don't exists. Becommes setted to 0
         self.p.addint("number", 3)
-        assert getint("number")() == 3 #This test fails. Why?
+        assert getint("number")() == 3
 
     def test_getdouble(self):
         #TODO: getdouble must be changed by adddouble(key, 0.0)
@@ -134,11 +134,11 @@ class TestProtocol(unittest.TestCase):
             def inner():
                 return self.p.getdouble(key)
             return inner
-        self.assertRaises(Exception, getdouble("fox")) #Is not a double
-        self.assertRaises(TyrantError, getdouble("lala")) #Don't exists
+        assert getdouble("fox")() == 0.0 #Is not a double. Becomes setted to 0
+        assert getdouble("lala")() == 0.0 #Don't exists. Becommes setted to 0
         self.p.adddouble("number", 3.0)
         assert self.p.adddouble("number", 3.0) == 6.0
-        assert getdouble("number")() == 3.0 #This test fails. Why? Because implememntation fails
+        assert getdouble("number")() == 6.0
 
     def test_mget(self):
         self.test_add_item()
