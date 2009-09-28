@@ -11,12 +11,14 @@ class TestProtocol(unittest.TestCase):
     TYRANT_PORT = 1983
     TYRANT_FILE = os.path.abspath('test123.tct')
     TYRANT_FILE_COPY = os.path.abspath('test321.tct')
-    TYRANT_PID  = os.path.abspath('test123.pid')
+    TYRANT_PID = os.path.abspath('test123.pid')
+    TYRANT_LUA = os.path.dirname(__file__) + '/test.lua'
     def setUp(self):
         assert not os.path.exists(self.TYRANT_FILE), 'Cannot proceed if test database already exists'
-        cmd = 'ttserver -dmn -host %(host)s -port %(port)s -pid %(pid)s %(file)s'
-        os.popen(cmd % {'host': self.TYRANT_HOST, 'port': self.TYRANT_PORT,
-                        'pid': self.TYRANT_PID, 'file': self.TYRANT_FILE}).read()
+        cmd = 'ttserver -dmn -host %(host)s -port %(port)s -pid %(pid)s -ext %(lua)s %(file)s'
+        cmd = cmd % {'host': self.TYRANT_HOST, 'port': self.TYRANT_PORT,
+                'pid': self.TYRANT_PID, 'file': self.TYRANT_FILE, 'lua': self.TYRANT_LUA}
+        os.popen(cmd).read()
         self.p = protocol.TyrantProtocol(host=self.TYRANT_HOST, port=self.TYRANT_PORT)
         self.p.vanish()  #XXX: Why this is needed?
 
@@ -116,7 +118,6 @@ class TestProtocol(unittest.TestCase):
         pass #Tested in other tests
 
     def test_getint(self):
-        #TODO: getint must be changed by addint(key, 0)
         self.test_add_item()
         def getint(key):
             def inner():
@@ -128,7 +129,6 @@ class TestProtocol(unittest.TestCase):
         assert getint("number")() == 3
 
     def test_getdouble(self):
-        #TODO: getdouble must be changed by adddouble(key, 0.0)
         self.test_add_item()
         def getdouble(key):
             def inner():
@@ -170,12 +170,11 @@ class TestProtocol(unittest.TestCase):
         assert len(self.p.fwmkeys("fo", 1)) == 1 #Testing maxkeys
         assert len(self.p.fwmkeys("fox", -1)) == 1
         assert len(self.p.fwmkeys("not_found", -1)) == 0
-        #XXX: In original bindings, maxkeys is optional
         assert len(self.p.fwmkeys("not_found")) == 0 #Optional parameter
 
     def test_ext(self):
-        #TODO: A lua script is needed
-        pass
+        print self.p.ext("test_ext", 0, "key", "value")
+        assert self.p.ext("test_ext", 0, "key", "value") == u"test: key=value"
 
     def test_sync(self):
         self.test_add_item()
@@ -203,6 +202,7 @@ class TestProtocol(unittest.TestCase):
 
     def test_setmst(self):
         #TODO: Test not done yet
+        #The test must be separated (slave need update log)
         pass
 
     def test_size(self):
