@@ -197,7 +197,7 @@ class Tyrant(dict):
             return rval
 
         # 1.1.11 protocol returns interleaved key, value list
-        d = dict((rval[i], _parse_elem(rval[i + 1], self.dbtype,
+        d = dict((rval[i], to_python(rval[i + 1], self.dbtype,
                                        self.separator)) \
                     for i in xrange(0, len(rval), 2))
         return d
