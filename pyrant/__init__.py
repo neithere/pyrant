@@ -159,12 +159,18 @@ class Tyrant(dict):
         """Returns the list of keys in the database."""
         return list(self.iterkeys())
 
-    def update(self, other, **kwargs):
-        """Updates/s given objects into the database."""
-        # TODO: write better documentation, provide example code
-        self.multi_set(other.iteritems())
-        if kwargs:
-            self.update(kwargs)
+    def update(self, dict=None, **kwargs):
+        """
+        Updates given objets from a dict, list of key and value pairs or a list of named params.
+
+        See update method in python built-in object for more info
+        """
+        data = {}
+        if dict:
+            data.update(dict, **kwargs)
+        else:
+            data.update(**kwargs)
+        self.multi_set(data)
 
     def multi_del(self, keys, no_update_log=False):
         """Removes given records from the database."""
