@@ -173,7 +173,6 @@ class TestProtocol(unittest.TestCase):
         assert len(self.p.fwmkeys("not_found")) == 0 #Optional parameter
 
     def test_ext(self):
-        print self.p.ext("test_ext", 0, "key", "value")
         assert self.p.ext("test_ext", 0, "key", "value") == u"test: key=value"
 
     def test_sync(self):
