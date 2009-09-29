@@ -36,6 +36,13 @@ class TestTyrant(unittest.TestCase):
 
         #os.popen('kill %s' % pid)
         os.unlink(self.TYRANT_FILE)
+        try:
+            os.unlink("%s.idx.store.qgr" % self.TYRANT_FILE)
+            os.unlink("%s.idx.stock.dec" % self.TYRANT_FILE)
+            os.unlink("%s.idx.id.lex" % self.TYRANT_FILE)
+            os.unlink("%s.idx.color.tok" % self.TYRANT_FILE)
+        except:
+            pass
 
     def __init__(self, methodName="runTest"):
         unittest.TestCase.__init__(self, methodName)
