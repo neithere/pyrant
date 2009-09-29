@@ -219,11 +219,13 @@ class TyrantProtocol(object):
         'scontains_or': RDBQCSTROR,
         'seq_or': RDBQCSTROREQ,
         'neq_or': RDBQCNUMOREQ,
+        'scontains_and': RDBQCSTRAND,
 
         # Full text search
         'slike': RDBQCFTSPH,
         'slike_all': RDBQCFTSAND,
         'slike_any': RDBQCFTSOR,
+        'ssearch': RDBQCFTSEX,
 
     }
 

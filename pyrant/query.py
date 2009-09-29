@@ -25,10 +25,19 @@ class Q(object):
         # FIXME all kwargs are ignored except for the last pair!!
         for kw, val in kwargs.iteritems():
             nameop = kw.split('__')
-            self._op = 's' if isinstance(val, (str, unicode)) else 'n'
-            self._op += nameop[1] if len(nameop) > 1 else 'eq'
             self.name = nameop[0]
-            self.expr = val
+            if isinstance(val, (tuple, list)):
+                if val and isinstance(val[0], int):
+                    self._op = 'n'
+                else:
+                    self._op = 's'
+
+                self._op += nameop[1] if len(nameop) > 1 else 'eq_or'
+                self.expr = " ".join(map(str, val))
+            else:
+                self._op = 's' if isinstance(val, (str, unicode)) else 'n'
+                self._op += nameop[1] if len(nameop) > 1 else 'eq'
+                self.expr = val
 
         self.negate = False
 
