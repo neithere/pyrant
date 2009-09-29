@@ -63,6 +63,8 @@ class Tyrant(dict):
         self.proto = TyrantProtocol(host, port)
         self.dbtype = self.get_stats()['type']
         self.separator = separator
+        if not separator and self.dbtype=="table":
+            self.separator = "\x00" #Default separator for tables
         self.literal = literal
 
     def __contains__(self, key):
@@ -207,6 +209,12 @@ class Tyrant(dict):
         opts = (no_update_log and TyrantProtocol.RDBMONOULOG or 0)
         lst = []
         for k, v in items.iteritems():
+            if isinstance(v, (dict)):
+                new_v = []
+                for kk, vv in v.items():
+                    new_v.append(kk)
+                    new_v.append(vv)
+                v = new_v
             if isinstance(v, (list, tuple)):
                 assert self.separator, "Separator is not set"
 
