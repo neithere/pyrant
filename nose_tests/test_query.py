@@ -4,7 +4,7 @@ import os
 
 from nose import *
 
-import sets
+from sets import Set
 
 class TestTyrant(unittest.TestCase):
     TYRANT_HOST = '127.0.0.1'
@@ -267,4 +267,70 @@ strawberry\tFarmer's Market\tred\t3.15\t214
 
     def test_operator_or(self):
         #TODO: Q | Q
-        pass
+        not_blue = self.q.filter( Q(color="red") | Q(color="yellow") )
+        assert len(not_blue) == 5
+        assert "blueberry" not in not_blue
+
+        complex_or = self.q.filter( Q(color="blue") | Q(store="Shopway") )
+        print complex_or
+        assert len(complex_or) == 3
+
+    def test_columns(self):
+        q = self.q.filter(id="apple")
+        assert q.columns("id", "store")[0] == dict(id="apple", store="Convenience Store")
+        assert q.columns("id color".split())[0] == dict(id="apple", color="red")
+        assert q.columns("price", "stock")[:] == [dict(price="1.20", stock="120")]
+
+    def test_union(self):
+        q_apple = self.q.filter(id="apple")
+        q_pear = self.q.filter(id="pear")
+        q_red = self.q.filter(color="red")
+        def get_ids(q):
+            res = q.columns("id")[:]
+            return Set([d["id"] for d in res])
+        assert get_ids(q_apple.union(q_pear)) == Set("apple pear".split())
+        assert get_ids(q_apple | q_pear) == Set("apple pear".split())
+        assert get_ids(q_pear | q_red) == Set("apple pear raspberry strawberry".split())
+
+    def test_intersect(self):
+        q_apple = self.q.filter(id="apple")
+        q_pear = self.q.filter(id="pear")
+        q_red = self.q.filter(color="red")
+        def get_ids(q):
+            res = q.columns("id")[:]
+            return Set([d["id"] for d in res])
+        assert get_ids(q_apple.intersect(q_pear)) == Set([])
+        assert get_ids(q_apple & q_pear) == Set([])
+        assert get_ids(q_apple & q_red) == Set(["apple"])
+
+    def test_intersect(self):
+        q_apple = self.q.filter(id="apple")
+        q_pear = self.q.filter(id="pear")
+        q_red = self.q.filter(color="red")
+        def get_ids(q):
+            res = q.columns("id")[:]
+            return Set([d["id"] for d in res])
+        assert get_ids(q_apple.minus(q_pear)) == Set(["apple"])
+        assert get_ids(q_apple - q_pear) == Set(["apple"])
+        assert get_ids(q_red - q_apple) == Set("raspberry strawberry".split())
+
+    def test_delete(self):
+        assert "apple" in self.t
+        self.q.filter(id="apple").delete()
+        assert "apple" not in self.t
+        assert "pear" in self.t
+        assert self.q.filter(id="pear").columns("color").delete() == [{u'color': u'yellow'}]
+        assert "pear" not in self.t
+        
+    def test_count(self):
+        q_red = self.q.filter(color="red")
+        assert q_red.count() == 3
+        del self.t["apple"]
+        assert q_red.count() == 2
+
+    def test_hint(self):
+        q_apple = self.q.filter(id="apple")
+        q_red = self.q.filter(color="red")
+        assert "HINT" in q_red.hint()[-1]
+        assert "HINT" in q_apple.hint()[-1]
+        

@@ -83,7 +83,8 @@ class Query(object):
     that abstract all queries for tyrant protocol.
     """
 
-    def __init__(self, proto, dbtype, literal=False, conditions=None):
+    def __init__(self, proto, dbtype, literal=False, conditions=None,
+            columns=None, ms_type=None, ms_conditions=None):
         if conditions:
             assert isinstance(conditions, list) and \
                    all(isinstance(c,Q) for c in conditions), \
@@ -95,11 +96,21 @@ class Query(object):
         self._proto = proto
         self._dbtype = dbtype
         self.literal = literal
+        self._columns = columns
+        self._ms_type = ms_type
+        self._ms_conditions = ms_conditions
 
     def _clone(self):
         conditions = [q._clone() for q in self._conditions]
+        ms_conditions = None
+        if self._ms_conditions:
+            ms_conditions = [[qry._clone() for qry in conds] for conds in self._ms_conditions]
+        columns = None
+        if self._columns:
+            columns = self._columns[:]
         query = Query(self._proto, self._dbtype, literal=self.literal,
-                      conditions=conditions)
+                      conditions=conditions, columns=columns,
+                      ms_type = self._ms_type, ms_conditions=ms_conditions)
         return query
 
     @staticmethod
@@ -241,6 +252,9 @@ class Query(object):
         # Do the query using getitem
         return str(self[:])
 
+    def _parse_conditions(self, c):
+        return (c.name, c.op, c.expr)
+
     def __getitem__(self, k):
         # Retrieve an item or slice from the set of results.
         if not isinstance(k, (slice, int, long)):
@@ -263,19 +277,124 @@ class Query(object):
         if cache_key in self._cache:
             return self._cache[cache_key]
 
-        conditions = [(c.name, c.op, c.expr) for c in self._conditions]
+        conditions = [self._parse_conditions(c) for c in self._conditions]
+        ms_conditions = None
+        if self._ms_type:
+            ms_conditions = [map(self._parse_conditions, ms_c) for ms_c in self._ms_conditions]
+            
 
         # Do the search.
         keys = self._proto.search(conditions, limit, offset,
                                   order_type=self._order_t,
-                                  order_field=self._order)
+                                  order_field=self._order,
+                                  columns=self._columns,
+                                  ms_type=self._ms_type,
+                                  ms_conditions=ms_conditions)
 
         # Since results are keys, we need to query for actual values
         if isinstance(k, slice):
-            ret = [self._to_python(key) for key in keys]
+            if self._columns:
+                ret = [self._to_python_dict(key) for key in keys]
+            else:
+                ret = [self._to_python(key) for key in keys]
         else:
-            ret = self._to_python(keys[0])
+            if self._columns:
+                ret = self._to_python_dict(keys[0])
+            else:
+                ret = self._to_python(keys[0])
 
         self._cache[cache_key] = ret
 
         return ret
+
+    def _to_python_dict(self, val):
+        vals = val.split("\x00")
+        return dict(zip(vals[:-1:2], vals[1::2]))
+
+    def columns(self, *args):
+        query = self._clone()
+        query._columns = None
+        if args:
+            query._columns = []
+            for arg in args:
+                if isinstance(arg, (tuple, list)):
+                    query._columns.extend(arg)
+                elif isinstance(arg, (str, unicode)):
+                    if arg == "*":
+                        query._columns = None
+                        break
+                    query._columns.append(arg)
+                else:
+                    raise TypeError("%s is not supported for describing columns" % arg)
+        return query
+
+    def union(self, other):
+        query = self._clone()
+        assert isinstance(other, Query), "This function needs other Query object type"
+        assert query._ms_type in (None, "OR"), "You can not mix union with intersect or minus"
+        other = other._clone()
+        if not query._ms_conditions:
+            query._ms_conditions = []
+        query._ms_conditions.append(other._conditions)
+        query._ms_type = "OR"
+        return query
+
+    def intersect(self, other):
+        query = self._clone()
+        assert isinstance(other, Query), "This function needs other Query object type"
+        assert query._ms_type in (None, "AND"), "You can not mix intersect with union or minus"
+        other = other._clone()
+        if not query._ms_conditions:
+            query._ms_conditions = []
+        query._ms_conditions.append(other._conditions)
+        query._ms_type = "AND"
+        return query
+
+    def minus(self, other):
+        query = self._clone()
+        assert isinstance(other, Query), "This function needs other Query object type"
+        assert query._ms_type in (None, "NOT"), "You can not mix minus with union or intersect"
+        other = other._clone()
+        if not query._ms_conditions:
+            query._ms_conditions = []
+        query._ms_conditions.append(other._conditions)
+        query._ms_type = "NOT"
+        return query
+
+    def __or__(self, other):
+        return self.union(other)
+
+    def __and__(self, other):
+        return self.intersect(other)
+
+    def __sub__(self, other):
+        return self.minus(other)
+
+    def _action_search(self, out=False, count=False, hint=False):
+        conditions = [self._parse_conditions(c) for c in self._conditions]
+        ms_conditions = None
+        if self._ms_type:
+            ms_conditions = [map(self._parse_conditions, ms_c) for ms_c in mc_conditions]
+        # Do the search.
+        keys = self._proto.search(conditions,
+                                  order_type=self._order_t,
+                                  order_field=self._order,
+                                  ms_type=self._ms_type,
+                                  ms_conditions=ms_conditions,
+                                  columns=self._columns,
+                                  out=out, count=count, hint=hint)
+        return keys
+
+    def delete(self):
+        keys = self._action_search(out=True)
+        if self._columns:
+            ret = [self._to_python_dict(key) for key in keys]
+        else:
+            ret = [self._to_python(key) for key in keys]
+        return ret
+
+    def count(self):
+        return int(self._action_search(count=True)[0])
+
+    def hint(self):
+        return self._action_search(hint=True)

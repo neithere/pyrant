@@ -388,12 +388,25 @@ class TyrantProtocol(object):
         return self._sock.get_unicode()
 
     def search(self, conditions, limit=10, offset=0,
-               order_type=0, order_field=None, opts=0):
+               order_type=0, order_field=None, opts=0,
+               ms_conditions=None, ms_type=None, columns=None,
+               out=None, count=None, hint=None):
         """Searches table elements.
 
         :param conditions: a list of tuples in the form ``(field, opt, expr)``
         """
         args = ["addcond\x00%s\x00%d\x00%s" % cond for cond in conditions]
+
+        #MetaSearch support
+        if ms_type and ms_conditions:
+            for conds in ms_conditions:
+                args += ['next']
+                args += ["addcond\x00%s\x00%d\x00%s" % cond for cond in conds]
+            args += ["mstype\x00%s" % ms_type]
+
+        #Returns only selected columns
+        if columns:
+            args += ["get\x00%s" % "\x00".join(columns)]
 
         # Set order in query
         if order_field:
@@ -402,6 +415,16 @@ class TyrantProtocol(object):
         # Set limit and offset
         if limit > 0 and offset >= 0:
             args += ['setlimit\x00%d\x00%d' % (limit, offset)]
+
+        # Deletes searched regs
+        if out:
+            args += ['out']
+
+        if count:
+            args += ['count']
+
+        if hint:
+            args += ['hint']
 
         return self.misc('search', args, opts)
 
