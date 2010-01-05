@@ -3,10 +3,14 @@ Pyrant
 
 Pyrant is a Python wrapper around Tokyo Tyrant. It provides:
 
-* TyrantProtocol: a thin API for the Tyrant protocol with support for table
-  database;
-* Tyrant: a higher-level dict-like API;
-* Query: a high-level API for complex queries (inspired by Django ORM). 
+* `pyrant.protocol` is a not-too-pythonic implementation of the Tyrant protocol. It
+  supports the table database and all Tyrant features but does not attempt to do
+  anything else;
+* `pyrant.Tyrant` is a higher-level pythonic dict-like API;
+* `pyrant.query` is a high-level API for complex queries (inspired by Django ORM).
+
+Usually you will only want to use the `Tyrant` class because it is built on top
+of the `protocol` module and provides access to it and to the query API.
 
 Documentation
 -------------
@@ -18,26 +22,23 @@ latest snapsnot by building it from the source (using Sphinx).
 What is Tokyo Tyrant?
 ---------------------
 
-Tokyo Tyrant is a network interface for Tokyo Cabinet.
+`Tokyo Tyrant`_ is a network interface for Tokyo Cabinet.
 
-Tokyo Cabinet is a lightweight database manager with several storages,
+`Tokyo Cabinet`_ is a lightweight database manager with several storages,
 including a simple key/value storage and a document-oriented schemaless
 database with powerful query machinery.
 
-More information about Tokyo Cabinet:
-    http://1978th.net/tokyocabinet/  
-    
-    More information about Tokyo Tyrant:
-        http://1978th.net/tokyotyrant/  
-        
+  .. _Tokyo Cabinet: http://1978th.net/tokyocabinet/
+  .. _Tokyo Tyrant: http://1978th.net/tokyotyrant/
+
 
 Models (schemata)
 -----------------
 
-Pyrant does not provide means for defining models, but another project called
-`Models`[1] allows to do that easily.
+Pyrant itself does not provide means for defining models, but our related project
+`Models`_ allows to do that easily.
 
-  [1] http://pypi.python.org/pypi/models/
+  .. _Models: http://pypi.python.org/pypi/models/
 
 Community
 ---------
