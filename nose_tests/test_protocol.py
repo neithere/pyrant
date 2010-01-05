@@ -1,8 +1,15 @@
-import unittest
-from pyrant import protocol, TyrantError
+# -*- coding: utf-8 -*-
+
+# python
 import os
 
+# testing
+import unittest
 from nose import *
+
+# the app
+from pyrant import protocol, TyrantError
+
 
 #TODO: Most TyrantError don't represents ecodes. Why exceptions then? Check it
 

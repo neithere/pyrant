@@ -1,10 +1,19 @@
-import unittest
-from pyrant import TyrantError, Tyrant
-import os
+# -*- coding: utf-8 -*-
 
+# python
+import os
+try:
+    set
+except NameError:
+    from sets import Set as set
+
+# testing
+import unittest
 from nose import *
 
-import sets
+# the app
+from pyrant import TyrantError, Tyrant
+
 
 class TestTyrant(unittest.TestCase):
     TYRANT_HOST = '127.0.0.1'
@@ -12,6 +21,7 @@ class TestTyrant(unittest.TestCase):
     TYRANT_FILE = os.path.abspath('test123.tct')
     TYRANT_PID = os.path.abspath('test123.pid')
     TYRANT_LUA = os.path.dirname(__file__) + '/test.lua'
+    
     def setUp(self):
         assert not os.path.exists(self.TYRANT_FILE), 'Cannot proceed if test database already exists'
         cmd = 'ttserver -dmn -host %(host)s -port %(port)s -pid %(pid)s -ext %(lua)s %(file)s'
@@ -99,8 +109,8 @@ class TestTyrant(unittest.TestCase):
         assert stats["type"] == "table"
 
     def test_iterkeys(self):
-        keys = sets.Set("apple blueberry peach pear raspberry strawberry".split())
-        db_keys = sets.Set([key for key in self.t.iterkeys()])
+        keys = set("apple blueberry peach pear raspberry strawberry".split())
+        db_keys = set([key for key in self.t.iterkeys()])
         assert keys == db_keys
 
     def test_keys(self):
@@ -173,3 +183,18 @@ class TestTyrant(unittest.TestCase):
 
     def test_query(self):
         pass
+
+    def test_unicode(self):
+        item_with_unicode_value = {'name': u'Андрей'}
+        item_with_unicode_key = {u'имя': 'Andrey'}
+        ascii_pk = 'primary key'
+        unicode_pk = u'первичный ключ'
+        
+        self.t[ascii_pk] = item_with_unicode_value
+        assert self.t[ascii_pk] == item_with_unicode_value
+        
+        self.t[ascii_pk] = item_with_unicode_key
+        assert self.t[ascii_pk] == item_with_unicode_key
+        
+        self.t[unicode_pk] = item_with_unicode_value
+        assert self.t[unicode_pk] == item_with_unicode_value

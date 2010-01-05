@@ -21,6 +21,7 @@ DB_TABLE  = 'table'
 DB_MEMORY = 'on-memory hash'
 DB_HASH   = 'hash'
 
+TABLE_COLUMN_SEP = '\x00'
 
 def _ulen(expr):
     return len(expr.encode(ENCODING)) \
@@ -59,7 +60,9 @@ def _pack(code, *args):
 
 
 class _TyrantSocket(object):
-    # Socket logic. We use this class as a wrapper to raw sockets.
+    """
+    Socket logic. We use this class as a wrapper to raw sockets.
+    """
 
     def __init__(self, host, port):
         self._sock = socket.socket()
@@ -70,7 +73,9 @@ class _TyrantSocket(object):
         self._sock.close()
 
     def send(self, *args, **kwargs):
-        """Pack arguments and send the buffer to the socket"""
+        """
+        Packs arguments and sends the buffer to the socket.
+        """
         sync = kwargs.pop('sync', True)
         # Send message to socket, then check for errors as needed.
         self._sock.sendall(_pack(*args))
@@ -82,48 +87,73 @@ class _TyrantSocket(object):
             raise TyrantError(fail_code)
 
     def recv(self, bytes):
-        """Get given bytes from socket"""
+        """
+        Retrieves given number of bytes from the socket and returns them as
+        string.
+        """
         d = ''
         while len(d) < bytes:
             d += self._sock.recv(min(8192, bytes - len(d)))
         return d
 
     def get_byte(self):
-        """Get 1 byte from socket."""
+        """
+        Retrieves one byte from the socket and returns it.
+        """
         return self.recv(1)
 
     def get_int(self):
-        """Get an integer (4 bytes) from socket."""
+        """
+        Retrieves an integer (4 bytes) from the socket and returns it.
+        """
         return struct.unpack('>I', self.recv(4))[0]
 
     def get_long(self):
-        """Get a long (8 bytes) from socket."""
+        """
+        Retrieves a long integer (8 bytes) from the socket and returns it.
+        """
         return struct.unpack('>Q', self.recv(8))[0]
 
     def get_str(self):
-        """Get a string (n bytes, which is an integer just before string)."""
+        """
+        Retrieves a string (n bytes, which is an integer just before string)
+        from the socket and returns it.
+        """
         return self.recv(self.get_int())
 
     def get_unicode(self):
-        """Get a unicode."""
+        """
+        Retrieves a unicode string from the socket and returns it. This method
+        uses :meth:`get_str`, which in turn makes use of :meth:`get_int`.
+        """
         return self.get_str().decode(ENCODING)
 
     def get_double(self):
-        """Get 2 long numbers (16 bytes) from socket"""
+        """
+        Retrieves two long integers (16 bytes) from the socket and returns them.
+        """
         intpart, fracpart = struct.unpack('>QQ', self.recv(16))
         return intpart + (fracpart * 1e-12)
 
     def get_strpair(self):
-        """Get string pair (n bytes, n bytes which are 2 integers just
-        before pair)"""
+        """
+        Retrieves a pair of strings (n bytes, n bytes which are 2 integers just
+        before the pair) and returns them as a tuple of strings.
+        """
         klen = self.get_int()
         vlen = self.get_int()
         return self.recv(klen), self.recv(vlen)
 
 
 class TyrantProtocol(object):
-    """Tyrant protocol raw implementation. There are all low level constants
-    and operations. You can use it if you need that atomicity in your requests
+    """
+    A straightforward implementation of the Tokyo Tyrant protocol. Provides all
+    low level constants and operations. Provides a level of abstraction that is
+    just enough to communicate with server from Python using Tyrant API.
+    
+    More sophisticated APIs can be built on top of this class. Two of them are
+    included in pyrant: the dict-like API (:class:`~pyrant.Pyrant`) and the 
+    query API (:class:`~pyrant.query.Query`).
     """
 
     # Protocol commands
@@ -187,9 +217,9 @@ class TyrantProtocol(object):
 
     # Operation types
 
-    TDBMSUNION = 1    # union
-    TDBMSISECT = 2    # intersection
-    TDBMSDIFF  = 3    # difference
+    TDBMSUNION = 0    # union
+    TDBMSISECT = 1    # intersection
+    TDBMSDIFF  = 2    # difference
 
     # Miscellaneous operation options
 
@@ -200,57 +230,31 @@ class TyrantProtocol(object):
     RDBXOLCKREC = 1    # record locking
     RDBXOLCKGLB = 2    # global locking
 
-    conditionsmap = {
-        # String conditions
-        'seq': RDBQCSTREQ,
-        'scontains': RDBQCSTRINC,
-        'sstartswith': RDBQCSTRBW,
-        'sendswith': RDBQCSTREW,
-        'smatchregex': RDBQCSTRRX,
-
-        # Numbers conditions
-        'neq': RDBQCNUMEQ,
-        'ngt': RDBQCNUMGT,
-        'nge': RDBQCNUMGE,
-        'nlt': RDBQCNUMLT,
-        'nle': RDBQCNUMLE,
-
-        # Multiple conditions
-        'scontains_or': RDBQCSTROR,
-        'seq_or': RDBQCSTROREQ,
-        'neq_or': RDBQCNUMOREQ,
-        'scontains_and': RDBQCSTRAND,
-
-        # Full text search
-        'slike': RDBQCFTSPH,
-        'slike_all': RDBQCFTSAND,
-        'slike_any': RDBQCFTSOR,
-        'ssearch': RDBQCFTSEX,
-
-    }
-
-
     def __init__(self, host, port):
         self._sock = _TyrantSocket(host, port)
 
     def put(self, key, value):
-        """Unconditionally sets key to value.
+        """
+        Unconditionally sets key to value.
         """
         self._sock.send(self.PUT, _ulen(key), _ulen(value), key, value)
 
     def putkeep(self, key, value):
-        """Sets key to value if key does not already exist.
+        """
+        Sets key to value if key does not already exist.
         """
         self._sock.send(self.PUTKEEP, _ulen(key), _ulen(value), key, value)
 
     def putcat(self, key, value):
-        """Appends value to the existing value for key, or sets key to
-        value if it does not already exist.
+        """
+        Appends value to the existing value for key, or sets key to value if it
+        does not already exist.
         """
         self._sock.send(self.PUTCAT, _ulen(key), _ulen(value), key, value)
 
     def putshl(self, key, value, width):
-        """Equivalent to:
+        """
+        Equivalent to:
 
             self.putcat(key, value)
             self.put(key, self.get(key)[-width:])
@@ -259,74 +263,86 @@ class TyrantProtocol(object):
                         value)
 
     def putnr(self, key, value):
-        """Sets key to value without waiting for a server response.
+        """
+        Sets key to value without waiting for a server response.
         """
         self._sock.send(self.PUTNR, _ulen(key), _ulen(value), key, value,
                         sync=False)
 
     def out(self, key):
-        """Removes key from server.
+        """
+        Removes key from server.
         """
         self._sock.send(self.OUT, _ulen(key), key)
 
     def get(self, key, literal=False):
-        """Returns the value of `key` as stored on the server.
+        """
+        Returns the value of `key` as stored on the server.
         """
         self._sock.send(self.GET, _ulen(key), key)
         return self._sock.get_str() if literal else self._sock.get_unicode()
 
     def getint(self, key):
-        """Returns an integer for given `key`. Value must be set by
+        """
+        Returns an integer for given `key`. Value must be set by
         :meth:`~pyrant.protocol.TyrantProtocol.addint`.
         """
         return self.addint(key)
 
     def getdouble(self, key):
-        """Returns a double for given key. Value must be set by
+        """
+        Returns a double for given key. Value must be set by
         :meth:`~pyrant.protocol.TyrantProtocol.adddouble`.
         """
         return self.adddouble(key)
 
     def mget(self, klst):
-        """Returns key,value pairs from the server for the given list of keys.
+        """
+        Returns key,value pairs from the server for the given list of keys.
         """
         self._sock.send(self.MGET, len(klst), klst)
         numrecs = self._sock.get_int()
         return [self._sock.get_strpair() for i in xrange(numrecs)]
 
     def vsiz(self, key):
-        """Returns the size of a value for given key.
+        """
+        Returns the size of a value for given key.
         """
         self._sock.send(self.VSIZ, _ulen(key), key)
         return self._sock.get_int()
 
     def iterinit(self):
-        """Begins iteration over all keys of the database.
+        """
+        Begins iteration over all keys of the database.
         """
         self._sock.send(self.ITERINIT)
 
     def iternext(self):
-        """Returns the next key after ``iterinit`` call. Raises
+        """
+        Returns the next key after ``iterinit`` call. Raises
         :class:`~pyrant.protocol.TyrantError` on iteration end.
         """
         self._sock.send(self.ITERNEXT)
         return self._sock.get_unicode()
 
     def fwmkeys(self, prefix, maxkeys=-1):
-        """Get up to the first maxkeys starting with prefix
+        """
+        Get up to the first maxkeys starting with prefix
         """
         self._sock.send(self.FWMKEYS, _ulen(prefix), maxkeys, prefix)
         numkeys = self._sock.get_int()
         return [self._sock.get_unicode() for i in xrange(numkeys)]
 
     def addint(self, key, num=0):
-        """Adds given integer to existing one. Stores and returns the sum.
+        """
+        Adds given integer to existing one. Stores and returns the sum.
         """
         self._sock.send(self.ADDINT, _ulen(key), num, key)
         return self._sock.get_int()
 
     def adddouble(self, key, num=0.0):
-        """Adds given double to existing one. Stores and returns the sum.
+        """
+        Adds given double to existing one. Stores and returns the sum.
         """
         fracpart, intpart = math.modf(num)
         fracpart, intpart = int(fracpart * 1e12), int(intpart)
@@ -335,7 +351,8 @@ class TyrantProtocol(object):
         return self._sock.get_double()
 
     def ext(self, func, opts, key, value):
-        """Calls ``func(key, value)`` with ``opts``.
+        """
+        Calls ``func(key, value)`` with ``opts``.
 
         :param opts: a bitflag that can be `RDBXOLCKREC` for record locking
             and/or `RDBXOLCKGLB` for global locking.
@@ -344,79 +361,119 @@ class TyrantProtocol(object):
                         func, key, value)
         return self._sock.get_unicode()
 
-    def sync(self):
-        """Synchronizes the database.
+    def sync(self):    # TODO: better documentation (why would someone need this?)
+        """
+        Synchronizes the updated contents of the remote database object with the
+        file and the device.
         """
         self._sock.send(self.SYNC)
 
     def vanish(self):
-        """Removes all records from the database.
+        """
+        Removes all records from the database.
         """
         self._sock.send(self.VANISH)
 
     def copy(self, path):
-        """Hot-copies the database to given path.
+        """
+        Hot-copies the database to given path.
         """
         self._sock.send(self.COPY, _ulen(path), path)
 
     def restore(self, path, msec):
-        """Restores the database from `path` at given timestamp (in `msec`).
+        """
+        Restores the database from `path` at given timestamp (in `msec`).
         """
         self._sock.send(self.RESTORE, _ulen(path), msec, path)
 
     def setmst(self, host, port):
-        """Sets master to `host`:`port`.
+        """
+        Sets master to `host`:`port`.
         """
         self._sock.send(self.SETMST, len(host), port, host)
 
     def rnum(self):
-        """Returns the number of records in the database.
+        """
+        Returns the number of records in the database.
         """
         self._sock.send(self.RNUM)
         return self._sock.get_long()
 
     def size(self):
-        """Returns the size of the database.
+        """
+        Returns the size of the database in bytes.
         """
         self._sock.send(self.SIZE)
         return self._sock.get_long()
 
     def stat(self):
-        """Returns some statistics about the database.
+        """
+        Returns some statistics about the database.
         """
         self._sock.send(self.STAT)
         return self._sock.get_unicode()
 
     def search(self, conditions, limit=10, offset=0,
-               order_type=0, order_field=None, opts=0,
+               order_type=0, order_column=None, opts=0,
                ms_conditions=None, ms_type=None, columns=None,
-               out=None, count=None, hint=None):
-        """Searches table elements.
-
-        :param conditions: a list of tuples in the form ``(field, opt, expr)``
+               out=False, count=False, hint=False):
         """
-        args = ["addcond\x00%s\x00%d\x00%s" % cond for cond in conditions]
+        Returns list of keys for elements matching given ``conditions``. 
 
-        #MetaSearch support
-        if ms_type and ms_conditions:
+        :param conditions: a list of tuples in the form ``(column, op, expr)``
+            where `column` is name of a column and `op` is operation code (one of
+            TyrantProtocol.RDBQC[...]). The conditions are implicitly combined
+            with logical AND. See `ms_conditions` and `ms_type` for more complex
+            operations.
+        :param limit: integer. Defaults to 10.
+        :param offset: integer. Defaults to 0.
+        :param order_column: string; if defined, results are sorted by this
+            column using default or custom ordering method.
+        :param order_type: one of TyrantProtocol.RDBQO[...]; if defined along
+            with `order_column`, results are sorted by the latter using given
+            method. Default is RDBQOSTRASC.
+        :param opts:
+        :param ms_conditions: MetaSearch conditions.
+        :param ms_type: MetaSearch operation type.
+        :param columns: iterable; if not empty, returns only given columns for
+            matched records.
+        :param out: boolean; if True, all items that correspond to the query are
+            deleted from the database when the query is executed.
+        :param count: boolean; if True, the return value is the number of items
+            that correspond to the query.
+        :param hint: boolean; if True, the hint string is added to the return
+            value.
+        """
+        # sanity check
+        assert limit  is None or 0 <= limit, 'wrong limit value "%s"' % limit
+        assert offset is None or 0 <= offset, 'wrong offset value "%s"' % offset
+        assert ms_type in (None, self.TDBMSUNION, self.TDBMSISECT, self.TDBMSDIFF)
+        assert order_type in (self.RDBQOSTRASC, self.RDBQOSTRDESC,
+                              self.RDBQONUMASC, self.RDBQONUMDESC) 
+        
+        # conditions
+        args = ['addcond\x00%s\x00%d\x00%s' % cond for cond in conditions]
+
+        # MetaSearch support (multiple additional queries, one Boolean operation)
+        if ms_type is not None and ms_conditions:
+            args += ['mstype\x00%s' % ms_type]
             for conds in ms_conditions:
                 args += ['next']
-                args += ["addcond\x00%s\x00%d\x00%s" % cond for cond in conds]
-            args += ["mstype\x00%s" % ms_type]
+                args += ['addcond\x00%s\x00%d\x00%s' % cond for cond in conds]
 
-        #Returns only selected columns
+        # return only selected columns
         if columns:
-            args += ["get\x00%s" % "\x00".join(columns)]
+            args += ['get\x00%s' % '\x00'.join(columns)]
 
-        # Set order in query
-        if order_field:
-            args += ['setorder\x00%s\x00%d' % (order_field, order_type)]
+        # set order in query
+        if order_column:
+            args += ['setorder\x00%s\x00%d' % (order_column, order_type)]
 
-        # Set limit and offset
-        if limit > 0 and offset >= 0:
+        # set limit and offset
+        if limit:   # and 0 <= offset:
             args += ['setlimit\x00%d\x00%d' % (limit, offset)]
 
-        # Deletes searched regs
+        # drop all records yielded by the query
         if out:
             args += ['out']
 
@@ -429,7 +486,8 @@ class TyrantProtocol(object):
         return self.misc('search', args, opts)
 
     def misc(self, func, args, opts=0):
-        """Executes custom function.
+        """
+        Executes custom function.
 
         :param func: the function name (see below)
         :param opts: a bitflag (see below)
@@ -458,4 +516,3 @@ class TyrantProtocol(object):
             numrecs = self._sock.get_int()
 
         return [self._sock.get_unicode() for i in xrange(numrecs)]
-

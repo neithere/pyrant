@@ -70,7 +70,7 @@ class TestProtocol(object):
 class TestTyrant(object):
     """
     >>> import pyrant
-    >>> from pyrant import Tyrant, Q
+    >>> from pyrant import Tyrant
     >>> t = Tyrant(host=TEST_HOST, port=TEST_PORT)
     >>> t.clear()
 
@@ -116,13 +116,13 @@ class TestTable(TestTyrant):
         """
         >>> t['i'] = {'name': 'Reflejo', 'test': 0}
         >>> t['you'] = {'name': 'Fulano', 'test': 1}
-        >>> res = t.query.filter(Q(name='Reflejo'), Q(test=0))
+        >>> res = t.query.filter(name='Reflejo', test=0)
         >>> key, data = res[0]
         >>> key
         u'i'
         >>> data['name']
         u'Reflejo'
-        >>> res = t.query.filter(Q(name='Reflejo') | Q(name='Fulano'))
+        >>> res = t.query.filter(name='Reflejo') | t.query.filter(name='Fulano')
         >>> len(res)
         2
 
@@ -138,10 +138,10 @@ class TestTable(TestTyrant):
 
     def query_order(self):
         """
-        >>> q = t.query.order('test')
+        >>> q = t.query.order_by('test')
         >>> [x[0] for x in q]
         [u'i', u'you', u'foo']
-        >>> q = q.order('-#test')
+        >>> q = q.order_by('-test')
         >>> [x[0] for x in q]
         [u'you', u'i', u'foo']
 

@@ -1,0 +1,49 @@
+Pyrant
+======
+
+Pyrant is a Python wrapper around Tokyo Tyrant. It provides:
+
+* TyrantProtocol: a thin API for the Tyrant protocol with support for table
+  database;
+* Tyrant: a higher-level dict-like API;
+* Query: a high-level API for complex queries (inspired by Django ORM). 
+
+Documentation
+-------------
+
+See complete `HTML documentation <http://packages.python.org/pyrant/>`_
+for details. Sometimes it may get slightly outdated. You can always have the
+latest snapsnot by building it from the source (using Sphinx).
+
+What is Tokyo Tyrant?
+---------------------
+
+Tokyo Tyrant is a network interface for Tokyo Cabinet.
+
+Tokyo Cabinet is a lightweight database manager with several storages,
+including a simple key/value storage and a document-oriented schemaless
+database with powerful query machinery.
+
+More information about Tokyo Cabinet:
+    http://1978th.net/tokyocabinet/  
+    
+    More information about Tokyo Tyrant:
+        http://1978th.net/tokyotyrant/  
+        
+
+Models (schemata)
+-----------------
+
+Pyrant does not provide means for defining models, but another project called
+`Models`[1] allows to do that easily.
+
+  [1] http://pypi.python.org/pypi/models/
+
+Community
+---------
+
+This application was originally created by Martin Conte Mac Donell with some
+code from PyTyrant by Bob Ippolito. Pyrant was subsequently improved by other
+developers. They are listed in the AUTHORS file.
+
+Please feel free to file issues and/or submit patches.

@@ -4,10 +4,10 @@ A pure-Python implementation of Tokyo Tyrant protocol.
 Python 2.4+ is required.
 
 More information about Tokyo Cabinet:
-    http://tokyocabinet.sourceforge.net/
+    http://1978th.net/tokyocabinet/
 
 More information about Tokyo Tyrant:
-    http://tokyocabinet.sourceforge.net/tyrantdoc/
+    http://1978th.net/tokyotyrant/
 
 Usage example (note the automatically managed support for table database)::
 
@@ -31,12 +31,12 @@ Usage example (note the automatically managed support for table database)::
 import itertools as _itertools
 from exceptions import TyrantError
 from protocol import TyrantProtocol
-from query import Query, Q
+from query import Query
 from utils import to_python
 
 
 __version__ = '0.1.0'
-__all__ = ['Tyrant', 'TyrantError', 'TyrantProtocol', 'Q']
+__all__ = ['Tyrant', 'TyrantError', 'TyrantProtocol']
 
 
 # Constants
@@ -95,6 +95,9 @@ class Tyrant(dict):
         except KeyError:
             return default
 
+    def __iter__(self):
+        return iter(self.iterkeys())
+
     def __len__(self):
         return self.proto.rnum()
 
@@ -145,8 +148,7 @@ class Tyrant(dict):
 
     def get_stats(self):
         """Returns the status message of the database as dictionary."""
-        return dict(l.split('\t', 1) \
-                        for l in self.proto.stat().splitlines() if l)
+        return utils.csv_to_dict(self.proto.stat())
 
     def iterkeys(self):
         """Iterates keys using remote operations."""

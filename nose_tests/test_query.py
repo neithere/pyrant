@@ -1,10 +1,19 @@
-import unittest
-from pyrant import TyrantError, Tyrant, Query, Q
-import os
+# -*- coding: utf-8 -*-
 
+# python
+import os
+try:
+    set
+except NameError:
+    from sets import Set as set
+
+# testing
+import unittest
 from nose import *
 
-from sets import Set
+# the app
+from pyrant import TyrantError, Tyrant, Query
+
 
 class TestTyrant(unittest.TestCase):
     TYRANT_HOST = '127.0.0.1'
@@ -78,13 +87,13 @@ strawberry\tFarmer's Market\tred\t3.15\t214
         self.t.update(self.data)
 
     def test_exact_match(self):
-        #Test implicit __eq operator
+        #Test implicit __is operator
         apple = self.q.filter(id="apple")[:]
         assert len(apple) == 1
         assert apple[0][1] == self.data["apple"]
 
-        #Test explicit __eq operator
-        pear = self.q.filter(id__eq="pear")[:]
+        #Test explicit __is lookup
+        pear = self.q.filter(id__is="pear")[:]
         assert len(pear) == 1
         assert pear[0][1] == self.data["pear"]
 
@@ -121,17 +130,21 @@ strawberry\tFarmer's Market\tred\t3.15\t214
         stock_300 = self.q.filter(stock=300)
         assert len(stock_300) == 1
         assert stock_300[0][0] == "peach"
-        stock_58 = self.q.filter(stock__eq=58)
+        stock_58 = self.q.filter(stock__is=58)
         assert len(stock_58) == 1
         assert stock_58[0][0] == "pear"
         good_stock = self.q.filter(stock__gt=100)
         assert len(good_stock) == 3
         for k, v in good_stock:
             assert k in "apple peach strawberry".split()
-        middle_stock = self.q.filter(stock__ge=58, stock__le=120)
+        
+        middle_stock = self.q.filter(stock__gte=58, stock__lte=120)
         assert len(middle_stock) == 3
         for k, v in middle_stock:
             assert k in "pear blueberry apple"
+        
+        middle_stock_between = self.q.filter(stock__between=[58, 120])
+        assert list(middle_stock) == list(middle_stock_between)
 
     def test_string_contains(self):
         with_s = self.q.filter(id__contains="s")
@@ -152,45 +165,33 @@ strawberry\tFarmer's Market\tred\t3.15\t214
             assert k in "blueberry raspberry strawberry".split()
 
     def test_string_matchregex(self):
-        regex = self.q.filter(id__matchregex=".ea.*")
+        regex = self.q.filter(id__matches=".ea.*")
         assert len(regex) == 2
         for k, v in regex:
             assert k in "peach pear".split()
 
     def test_token_eq_or(self):
         #Test string token
-        yellow_blue = self.q.filter(color__eq_or="blue yellow")
-        assert len(yellow_blue) == 3
-        for k, v in yellow_blue:
-            assert k in "blueberry peach pear".split()
-
-        #Test implicit form
-        yellow_blue = self.q.filter(color=["blue", "yellow"])
+        yellow_blue = self.q.filter(color__in=["blue", "yellow"])
         assert len(yellow_blue) == 3
         for k, v in yellow_blue:
             assert k in "blueberry peach pear".split()
 
         #Test numeric token
-        some_stocks = self.q.filter(stock__eq_or=[12, 120])
-        assert len(some_stocks) == 2
-        for k, v in some_stocks:
-            assert k in "apple raspberry".split()
-
-        #Test implicit form
-        some_stocks = self.q.filter(stock=[12, 120])
+        some_stocks = self.q.filter(stock__in=[12, 120])
         assert len(some_stocks) == 2
         for k, v in some_stocks:
             assert k in "apple raspberry".split()
         
 
     def test_token_contains_or(self):
-        market_store = self.q.filter(store__contains_or="Market Store")
+        market_store = self.q.filter(store__contains_any=["Market", "Store"])
         assert len(market_store) == 4
         for k, v in market_store:
             assert k in "apple blueberry pear strawberry".split()
 
     def test_token_contains_and(self):
-        store_convenience = self.q.filter(store__contains_and="Store Convenience")
+        store_convenience = self.q.filter(store__contains=["Store", "Convenience"])
         assert len(store_convenience) == 1
         assert store_convenience[0][0] == "apple"
 
@@ -205,14 +206,14 @@ strawberry\tFarmer's Market\tred\t3.15\t214
         assert len(market) == 0
 
     def test_qgr_like_all(self):
-        store = self.q.filter(store__like_all="nience store")
+        store = self.q.filter(store__like="nience store".split())
         assert len(store) == 1
         assert store[0][0] == "apple"
-        store = self.q.filter(store__like_all="market store")
+        store = self.q.filter(store__like="market store".split())
         assert len(store) == 0
 
     def test_qgr_like_any(self):
-        market_store = self.q.filter(store__like_any="market store")
+        market_store = self.q.filter(store__like_any="market store".split())
         assert len(market_store) == 4
         for k, v in market_store:
             assert k in "apple blueberry pear strawberry".split()
@@ -228,28 +229,28 @@ strawberry\tFarmer's Market\tred\t3.15\t214
 
     def test_order(self):
         #Gets some fruits
-        fruits = self.q.filter(id=["apple", "blueberry", "peach"])
+        fruits = self.q.filter(id__in=["apple", "blueberry", "peach"])
         
         #Order by name
-        named_fruits = fruits.order("id")
+        named_fruits = fruits.order_by("id")
         assert named_fruits[0][0] == "apple"
         assert named_fruits[1][0] == "blueberry"
         assert named_fruits[2][0] == "peach"
 
         #Order by name desc
-        named_fruits_desc = fruits.order("-id")
+        named_fruits_desc = fruits.order_by("-id")
         assert named_fruits_desc[0][0] == "peach"
         assert named_fruits_desc[1][0] == "blueberry"
         assert named_fruits_desc[2][0] == "apple"
 
         #Order by stock
-        stock_fruits = fruits.order("#stock")
+        stock_fruits = fruits.order_by("stock", numeric=True)
         assert stock_fruits[0][0] == "blueberry"
         assert stock_fruits[1][0] == "apple"
         assert stock_fruits[2][0] == "peach"
 
         #Order by stock desc
-        stock_fruits_desc = fruits.order("-#stock")
+        stock_fruits_desc = fruits.order_by("-stock", numeric=True)
         assert stock_fruits_desc[0][0] == "peach"
         assert stock_fruits_desc[1][0] == "apple"
         assert stock_fruits_desc[2][0] == "blueberry"
@@ -267,18 +268,18 @@ strawberry\tFarmer's Market\tred\t3.15\t214
 
     def test_operator_or(self):
         #TODO: Q | Q
-        not_blue = self.q.filter( Q(color="red") | Q(color="yellow") )
+        not_blue = self.q.filter(color="red") | self.q.filter(color="yellow")
         assert len(not_blue) == 5
         assert "blueberry" not in not_blue
 
-        complex_or = self.q.filter( Q(color="blue") | Q(store="Shopway") )
+        complex_or = self.q.filter(color="blue") | self.q.filter(store="Shopway")
         print complex_or
         assert len(complex_or) == 3
 
     def test_columns(self):
         q = self.q.filter(id="apple")
         assert q.columns("id", "store")[0] == dict(id="apple", store="Convenience Store")
-        assert q.columns("id color".split())[0] == dict(id="apple", color="red")
+        assert q.columns(*"id color".split())[0] == dict(id="apple", color="red")
         assert q.columns("price", "stock")[:] == [dict(price="1.20", stock="120")]
 
     def test_union(self):
@@ -287,10 +288,10 @@ strawberry\tFarmer's Market\tred\t3.15\t214
         q_red = self.q.filter(color="red")
         def get_ids(q):
             res = q.columns("id")[:]
-            return Set([d["id"] for d in res])
-        assert get_ids(q_apple.union(q_pear)) == Set("apple pear".split())
-        assert get_ids(q_apple | q_pear) == Set("apple pear".split())
-        assert get_ids(q_pear | q_red) == Set("apple pear raspberry strawberry".split())
+            return set([d["id"] for d in res])
+        assert get_ids(q_apple.union(q_pear)) == set("apple pear".split())
+        assert get_ids(q_apple | q_pear) == set("apple pear".split())
+        assert get_ids(q_pear | q_red) == set("apple pear raspberry strawberry".split())
 
     def test_intersect(self):
         q_apple = self.q.filter(id="apple")
@@ -298,10 +299,10 @@ strawberry\tFarmer's Market\tred\t3.15\t214
         q_red = self.q.filter(color="red")
         def get_ids(q):
             res = q.columns("id")[:]
-            return Set([d["id"] for d in res])
-        assert get_ids(q_apple.intersect(q_pear)) == Set([])
-        assert get_ids(q_apple & q_pear) == Set([])
-        assert get_ids(q_apple & q_red) == Set(["apple"])
+            return set([d["id"] for d in res])
+        assert get_ids(q_apple.intersect(q_pear)) == set([])
+        assert get_ids(q_apple & q_pear) == set([])
+        assert get_ids(q_apple & q_red) == set(["apple"])
 
     def test_intersect(self):
         q_apple = self.q.filter(id="apple")
@@ -309,10 +310,10 @@ strawberry\tFarmer's Market\tred\t3.15\t214
         q_red = self.q.filter(color="red")
         def get_ids(q):
             res = q.columns("id")[:]
-            return Set([d["id"] for d in res])
-        assert get_ids(q_apple.minus(q_pear)) == Set(["apple"])
-        assert get_ids(q_apple - q_pear) == Set(["apple"])
-        assert get_ids(q_red - q_apple) == Set("raspberry strawberry".split())
+            return set([d["id"] for d in res])
+        assert get_ids(q_apple.minus(q_pear)) == set(["apple"])
+        assert get_ids(q_apple - q_pear) == set(["apple"])
+        assert get_ids(q_red - q_apple) == set("raspberry strawberry".split())
 
     def test_delete(self):
         assert "apple" in self.t
@@ -333,4 +334,3 @@ strawberry\tFarmer's Market\tred\t3.15\t214
         q_red = self.q.filter(color="red")
         assert "HINT" in q_red.hint()[-1]
         assert "HINT" in q_apple.hint()[-1]
-        

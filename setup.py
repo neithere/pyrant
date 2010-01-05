@@ -17,15 +17,20 @@
 The setup and build script for the pyrant library.
 """
 
+import os
 from setuptools import setup
+
 import pyrant
+
+readme = open(os.path.join(os.path.dirname(__file__), 'README')).read()
 
 setup(
     name = "pyrant",
     version = pyrant.__version__,
     url = 'http://code.google.com/p/pyrant/',
     license = 'Apache License 2.0',
-    description='A python wrapper around Tokyo Tyrant',
+    description = 'A python wrapper around Tokyo Tyrant',
+    long_description = readme,
     author = 'Martin Conte Mac Donell',
     author_email = 'Reflejo@gmail.com',
     packages = ['pyrant'],
