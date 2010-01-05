@@ -268,28 +268,21 @@ class Query(object):
 
         Supported keyword lookups and appropriate expression types are:
 
-            * `any`: 
-            * `is`: Equals (default) to expression
-            * `lt`: Less than expression
-            * `lte`: Less or equal to expression
-            * `gt`: Greater than expression
-            * `gte`: Greater or equal to expression
-            * 'any' (list of strings)
-            * 'between' (list of numbers)
-            * 'contains' (string)
-            * 'endswith' (string)
-            * 'exists' (boolean)
-            * 'gt' (number)
-            * 'gte' (number)
-            * 'in' (list of strings or numbers)
-            * 'is' (string, list of strings or a number)
-            * 'like' (string or list of strings)
-            * 'like_any' (list of strings)
-            * 'lt' (number)
-            * 'lte' (number)
-            * 'matches' (string)
-            * 'search' (string)
-            * 'startswith' (string)
+            * `between`: (list of numbers)
+            * `contains`: (string or list of strings)
+            * `endswith`: (string)
+            * `exists`: (boolean)
+            * `gt`: (number)
+            * `gte`: (number)
+            * `in`: (list of strings or numbers)
+            * `is`: (string, list of strings or a number)
+            * `like`: (string or list of strings)
+            * `like_any`: (list of strings)
+            * `lt` (number)
+            * `lte` (number)
+            * `matches` (string)
+            * `search` (string)
+            * `startswith` (string)
 
         If a column name is provided with no lookup, exact match (`is`) is
         assumed.
