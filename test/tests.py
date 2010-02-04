@@ -45,7 +45,7 @@ class TestProtocol(object):
         >>> p.iternext()
         Traceback (most recent call last):
             ...
-        TyrantError: 1
+        InvalidOperation
 
         """
 
@@ -62,7 +62,7 @@ class TestProtocol(object):
         >>> p.get('fox')
         Traceback (most recent call last):
             ...
-        TyrantError: 1
+        InvalidOperation
 
         """
 

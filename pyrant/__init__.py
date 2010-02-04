@@ -29,14 +29,14 @@ Usage example (note the automatically managed support for table database)::
 """
 
 import itertools as _itertools
-from exceptions import TyrantError
-from protocol import TyrantProtocol
-from query import Query
-from utils import to_python
+import exceptions
+import protocol
+import query
+import utils
 
 
-__version__ = '0.1.0'
-__all__ = ['Tyrant', 'TyrantError', 'TyrantProtocol']
+__version__ = '0.1.1'
+__all__ = ['Tyrant']
 
 
 # Constants
@@ -56,21 +56,20 @@ class Tyrant(dict):
     def __init__(self, host=DEFAULT_HOST, port=DEFAULT_PORT, separator=None,
                  literal=False):
         """
-        Acts like a python dictionary.
+        The pythonic interface for Tokyo Tyrant. Mimics dict API.
         """
-        # We want to make protocol public just in case anyone need any
-        # specific option
-        self.proto = TyrantProtocol(host, port)
+        # keep the protocol public just in case anyone needs a specific option
+        self.proto = protocol.TyrantProtocol(host, port)
         self.dbtype = self.get_stats()['type']
         self.separator = separator
-        if not separator and self.dbtype=="table":
-            self.separator = "\x00" #Default separator for tables
+        if not separator and self.dbtype == "table":
+            self.separator = protocol.TABLE_COLUMN_SEP
         self.literal = literal
 
     def __contains__(self, key):
         try:
             self.proto.vsiz(key)
-        except TyrantError:
+        except exceptions.TyrantError:
             return False
         else:
             return True
@@ -78,18 +77,20 @@ class Tyrant(dict):
     def __delitem__(self, key):
         try:
             return self.proto.out(key)
-        except TyrantError:
+        except exceptions.TyrantError:
             raise KeyError(key)
 
     def __getitem__(self, key):
         try:
             elem = self.proto.get(key, self.literal)
             return utils.to_python(elem, self.dbtype, self.separator)
-        except TyrantError:
+        except exceptions.TyrantError:
             raise KeyError(key)
 
     def get(self, key, default=None):
-        """Returns value for `key`. If no record is found, returns `default`."""
+        """
+        Returns value for `key`. If no record is found, returns `default`.
+        """
         try:
             return self[key]
         except KeyError:
@@ -105,9 +106,16 @@ class Tyrant(dict):
         return object.__repr__(self)
 
     def __setitem__(self, key, value):
+        """
+        Sets given value for given primary key in the database.
+        Additional types conversion is only done if the value is a dictionary.
+        """
+
         if isinstance(value, dict):
-            flat = _itertools.chain([key], *value.iteritems())
-            self.proto.misc('put', list(flat))
+            pairs = ((k, utils.from_python(v)) for k,v in value.iteritems())
+            flat_pairs = _itertools.chain(*pairs)
+            args = [key] + list(flat_pairs)
+            self.proto.misc('put', args)
 
         elif isinstance(value, (list, tuple)):
             assert self.separator, "Separator is not set"
@@ -121,18 +129,24 @@ class Tyrant(dict):
 
     def call_func(self, func, key, value, record_locking=False,
                   global_locking=False):
-        """Calls specific function."""
+        """
+        Calls specific function.
+        """
         # TODO: write better documentation *OR* move this method to lower level
-        opts = ((record_locking and TyrantProtocol.RDBXOLCKREC) |
-                (global_locking and TyrantProtocol.RDBXOLCKGLB))
+        opts = ((record_locking and protocol.TyrantProtocol.RDBXOLCKREC) |
+                (global_locking and protocol.TyrantProtocol.RDBXOLCKGLB))
         return self.proto.ext(func, opts, key, value)
 
     def clear(self):
-        """Removes all records from the remote database."""
+        """
+        Removes all records from the remote database.
+        """
         self.proto.vanish()
 
     def concat(self, key, value, width=None):
-        """Concatenates columns of the existing record."""
+        """
+        Concatenates columns of the existing record.
+        """
         # TODO: write better documentation, provide example code
         if width is None:
             self.proto.putcat(key, value)
@@ -140,54 +154,63 @@ class Tyrant(dict):
             self.proto.putshl(key, value, width)
 
     def get_size(self, key):
-        """Returns the size of the value for `key`."""
+        """
+        Returns the size of the value for `key`.
+        """
         try:
             return self.proto.vsiz(key)
-        except TyrantError:
+        except exceptions.TyrantError:
             raise KeyError(key)
 
     def get_stats(self):
-        """Returns the status message of the database as dictionary."""
+        """
+        Returns the status message of the database as dictionary.
+        """
         return utils.csv_to_dict(self.proto.stat())
 
     def iterkeys(self):
-        """Iterates keys using remote operations."""
+        """
+        Iterates keys using remote operations.
+        """
         self.proto.iterinit()
         try:
             while True:
                 yield self.proto.iternext()
-        except TyrantError:
+        except exceptions.TyrantError:
             pass
 
     def keys(self):
-        """Returns the list of keys in the database."""
+        """
+        Returns the list of keys in the database.
+        """
         return list(self.iterkeys())
 
-    def update(self, dict=None, **kwargs):
+    def update(self, mapping=None, **kwargs):
         """
         Updates given objets from a dict, list of key and value pairs or a list of named params.
 
         See update method in python built-in object for more info
         """
-        data = {}
-        if dict:
-            data.update(dict, **kwargs)
-        else:
-            data.update(**kwargs)
+        data = dict(mapping or {}, **kwargs)
         self.multi_set(data)
 
     def multi_del(self, keys, no_update_log=False):
-        """Removes given records from the database."""
+        """
+        Removes given records from the database.
+        """
         # TODO: write better documentation: why would user need the no_update_log param?
-        opts = (no_update_log and TyrantProtocol.RDBMONOULOG or 0)
+        opts = (no_update_log and protocol.TyrantProtocol.RDBMONOULOG or 0)
         if not isinstance(keys, (list, tuple)):
             keys = list(keys)
 
         self.proto.misc("outlist", keys, opts)
 
     def multi_get(self, keys, no_update_log=False):
-        """Returns a list of records that match given keys."""
-        opts = (no_update_log and TyrantProtocol.RDBMONOULOG or 0)
+        """
+        Returns a list of records that match given keys.
+        """
+        # TODO: write better documentation: why would user need the no_update_log param?
+        opts = (no_update_log and protocol.TyrantProtocol.RDBMONOULOG or 0)
         if not isinstance(keys, (list, tuple)):
             keys = list(keys)
 
@@ -201,14 +224,15 @@ class Tyrant(dict):
             return rval
 
         # 1.1.11 protocol returns interleaved key, value list
-        d = dict((rval[i], to_python(rval[i + 1], self.dbtype,
-                                       self.separator)) \
+        d = dict((rval[i], utils.to_python(rval[i + 1], self.dbtype, self.separator))
                     for i in xrange(0, len(rval), 2))
         return d
 
     def multi_set(self, items, no_update_log=False):
-        """Stores given records in the database."""
-        opts = (no_update_log and TyrantProtocol.RDBMONOULOG or 0)
+        """
+        Stores given records in the database.
+        """
+        opts = (no_update_log and protocol.TyrantProtocol.RDBMONOULOG or 0)
         lst = []
         for k, v in items.iteritems():
             if isinstance(v, (dict)):
@@ -226,7 +250,8 @@ class Tyrant(dict):
         self.proto.misc("putlist", lst, opts)
 
     def prefix_keys(self, prefix, maxkeys=None):
-        """Get forward matching keys in a database.
+        """
+        Get forward matching keys in a database.
         The return value is a list object of the corresponding keys.
         """
         # TODO: write better documentation: describe purpose, provide example code
@@ -236,11 +261,15 @@ class Tyrant(dict):
         return self.proto.fwmkeys(prefix, maxkeys)
 
     def sync(self):
-        """Synchronizes updated content with the database."""
+        """
+        Synchronizes updated content with the database.
+        """
         # TODO: write better documentation: when would user need this?
         self.proto.sync()
 
     @property
     def query(self):
-        """Returns a :class:`~pyrant.Query` object for the database."""
-        return Query(self.proto, self.dbtype, self.literal)
+        """
+        Returns a :class:`~pyrant.Query` object for the database.
+        """
+        return query.Query(self.proto, self.dbtype, self.literal)

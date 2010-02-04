@@ -12,7 +12,19 @@ import unittest
 from nose import *
 
 # the app
-from pyrant import TyrantError, Tyrant, Query
+from pyrant import Tyrant
+from pyrant.query import Query
+
+
+def query_equals(query, keys):
+    """
+    assert query_equals(t.query.filter(foo='bar'), "foo bar quux")
+    """
+    if not hasattr(keys, '__iter__'):
+        keys = keys.split()
+    if len(query) == len(keys) and set([item[0] for item in query]) == set(keys):
+        return True
+    return False
 
 
 class TestTyrant(unittest.TestCase):
@@ -137,69 +149,54 @@ strawberry\tFarmer's Market\tred\t3.15\t214
         assert len(good_stock) == 3
         for k, v in good_stock:
             assert k in "apple peach strawberry".split()
-        
+
         middle_stock = self.q.filter(stock__gte=58, stock__lte=120)
         assert len(middle_stock) == 3
-        for k, v in middle_stock:
-            assert k in "pear blueberry apple"
-        
+        assert query_equals(middle_stock, "pear blueberry apple")
+
         middle_stock_between = self.q.filter(stock__between=[58, 120])
         assert list(middle_stock) == list(middle_stock_between)
 
+        self.assertRaises(ValueError, lambda: list(self.q.filter(stock__between=[1])))
+        self.assertRaises(ValueError, lambda: list(self.q.filter(stock__between=[1, 2, 3])))
+        self.assertRaises(ValueError, lambda: list(self.q.filter(stock__between=['a', 'b'])))
+
     def test_string_contains(self):
         with_s = self.q.filter(id__contains="s")
-        assert len(with_s) == 2
-        for k, v in with_s:
-            assert k in "raspberry strawberry".split()
+        assert query_equals(with_s, "raspberry strawberry")
 
     def test_string_startswith(self):
         start = self.q.filter(id__startswith="pe")
-        assert len(start) == 2
-        for k, v in start:
-            assert k in "peach pear".split()
+        assert query_equals(start, "peach pear")
 
     def test_string_endswith(self):
         ends = self.q.filter(id__endswith="berry")
-        assert len(ends) == 3
-        for k, v in ends:
-            assert k in "blueberry raspberry strawberry".split()
+        assert query_equals(ends, "blueberry raspberry strawberry")
 
     def test_string_matchregex(self):
         regex = self.q.filter(id__matches=".ea.*")
-        assert len(regex) == 2
-        for k, v in regex:
-            assert k in "peach pear".split()
+        assert query_equals(regex, "peach pear")
 
     def test_token_eq_or(self):
         #Test string token
         yellow_blue = self.q.filter(color__in=["blue", "yellow"])
-        assert len(yellow_blue) == 3
-        for k, v in yellow_blue:
-            assert k in "blueberry peach pear".split()
+        assert query_equals(yellow_blue, "blueberry peach pear")
 
         #Test numeric token
         some_stocks = self.q.filter(stock__in=[12, 120])
-        assert len(some_stocks) == 2
-        for k, v in some_stocks:
-            assert k in "apple raspberry".split()
-        
+        assert query_equals(some_stocks, "apple raspberry")
 
     def test_token_contains_or(self):
         market_store = self.q.filter(store__contains_any=["Market", "Store"])
-        assert len(market_store) == 4
-        for k, v in market_store:
-            assert k in "apple blueberry pear strawberry".split()
+        assert query_equals(market_store, "apple blueberry pear strawberry")
 
     def test_token_contains_and(self):
         store_convenience = self.q.filter(store__contains=["Store", "Convenience"])
-        assert len(store_convenience) == 1
         assert store_convenience[0][0] == "apple"
 
     def test_qgr_like(self):
         market = self.q.filter(store__like="market")
-        assert len(market) == 3
-        for k, v in market:
-            assert k in "blueberry pear strawberry".split()
+        assert query_equals(market, "blueberry pear strawberry")
 
         #Like is not like any
         market = self.q.filter(store__like="market store")
@@ -214,23 +211,48 @@ strawberry\tFarmer's Market\tred\t3.15\t214
 
     def test_qgr_like_any(self):
         market_store = self.q.filter(store__like_any="market store".split())
-        assert len(market_store) == 4
-        for k, v in market_store:
-            assert k in "apple blueberry pear strawberry".split()
+        assert query_equals(market_store, "apple blueberry pear strawberry")
 
     def test_qgr_search(self):
         market_store = self.q.filter(store__search="market || store")
-        assert len(market_store) == 4
-        for k, v in market_store:
-            assert k in "apple blueberry pear strawberry".split()
+        assert query_equals(market_store, "apple blueberry pear strawberry")
 
         market_store = self.q.filter(store__search="market && store")
         assert len(market_store) == 0
 
+    def test_exists(self):
+        self.t['stray_dog'] = {'color': 'brown', 'name': 'Fido'}
+
+        with_name = self.q.filter(name__exists=True)
+        without_name_outer = self.q.exclude(name__exists=True)
+        without_name_inner = self.q.filter(name__exists=False)
+        with_name_dbl_neg = self.q.exclude(name__exists=False)
+
+        expected_named = 'stray_dog'
+        expected_unnamed = 'strawberry apple peach raspberry pear blueberry'
+
+        assert query_equals(with_name, expected_named)
+        assert query_equals(without_name_outer, expected_unnamed)
+        assert query_equals(without_name_inner, expected_unnamed)
+        assert query_equals(with_name_dbl_neg, expected_named)
+
+        del self.t['stray_dog']
+
+    def test_boolean(self):
+        # make sure we can tell an edible missile from other kinds of missiles
+        self.t['pie']  = {'type': 'missile', 'edible': True,  'name': 'Pie'}
+        self.t['icbm'] = {'type': 'missile', 'edible': False, 'name': 'Trident'}
+        assert query_equals(self.t.query.filter(edible=True), 'pie')
+        assert query_equals(self.t.query.filter(edible=False), 'icbm')
+
+        # boolean semantics are preserved when data is converted back to Python
+        self.assertEquals(bool(self.t['pie']['edible']), True)
+        self.assertEquals(bool(self.t['icbm']['edible']), False)
+
     def test_order(self):
         #Gets some fruits
         fruits = self.q.filter(id__in=["apple", "blueberry", "peach"])
-        
+
         #Order by name
         named_fruits = fruits.order_by("id")
         assert named_fruits[0][0] == "apple"
@@ -322,7 +344,7 @@ strawberry\tFarmer's Market\tred\t3.15\t214
         assert "pear" in self.t
         assert self.q.filter(id="pear").columns("color").delete() == [{u'color': u'yellow'}]
         assert "pear" not in self.t
-        
+
     def test_count(self):
         q_red = self.q.filter(color="red")
         assert q_red.count() == 3

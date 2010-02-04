@@ -8,10 +8,8 @@ import unittest
 from nose import *
 
 # the app
-from pyrant import protocol, TyrantError
+from pyrant import protocol, exceptions
 
-
-#TODO: Most TyrantError don't represents ecodes. Why exceptions then? Check it
 
 class TestProtocol(unittest.TestCase):
     TYRANT_HOST = '127.0.0.1'
@@ -56,7 +54,7 @@ class TestProtocol(unittest.TestCase):
         self.p.iterinit()
         assert self.p.iternext() == u'foo'
         assert self.p.iternext() == u'fox'
-        self.assertRaises(TyrantError, self.p.iternext)
+        self.assertRaises(exceptions.InvalidOperation, self.p.iternext)
 
     def test_get_multiple_items_at_once(self):
         self.test_add_item() #Put data fields
@@ -69,7 +67,7 @@ class TestProtocol(unittest.TestCase):
             def inner():
                 self.p.get(key)
             return inner
-        self.assertRaises(TyrantError, getter('fox'))
+        self.assertRaises(exceptions.InvalidOperation, getter('fox'))
         assert self.p.get(u'foo') == u'bar\x00baz' #Don't Vanish de DB
 
     def test_putkeep(self):
@@ -78,7 +76,8 @@ class TestProtocol(unittest.TestCase):
             def inner():
                 self.p.putkeep(key, value)
             return inner
-        self.assertRaises(TyrantError, pk('fox', 'old_value\x00not_stablished'))
+        self.assertRaises(exceptions.InvalidOperation,
+                          pk('fox', 'old_value\x00not_stablished'))
         assert self.p.rnum() == 2
         assert self.p.get(u'fox') == u'box\x00quux'
         self.p.putkeep('new_fox', 'new_value\x00stablished')
@@ -115,11 +114,11 @@ class TestProtocol(unittest.TestCase):
             def inner():
                 return self.p.get(key)
             return inner
-        self.assertRaises(TyrantError, get("not_existant_key"))
-        self.assertRaises(TyrantError, out("not_existant_key"))
+        self.assertRaises(exceptions.InvalidOperation, get("not_existant_key"))
+        self.assertRaises(exceptions.InvalidOperation, out("not_existant_key"))
         assert get("fox")() == "box\x00quux"
         out("fox")()
-        self.assertRaises(TyrantError, get("fox"))
+        self.assertRaises(exceptions.InvalidOperation, get("fox"))
 
     def test_get(self):
         pass #Tested in other tests
@@ -155,21 +154,21 @@ class TestProtocol(unittest.TestCase):
         assert len(ret) == 2
         assert self.p.mget(["ne", "not_exists", "none"]) == []
         assert self.p.mget([]) == []
-        self.assertRaises(Exception, self.p.mget) #A non List argument must fail
-        self.assertRaises(Exception, lambda:self.p.mget(9)) #A non List argument must fail
+        self.assertRaises(TypeError, self.p.mget) #A non List argument must fail
+        self.assertRaises(TypeError, lambda:self.p.mget(9)) #A non List argument must fail
 
     def test_vsiz(self):
         self.test_add_item()
         assert self.p.vsiz("foo") == len('bar\x00baz') +1
         assert self.p.vsiz("fox") == len('box\x00quux') +1
-        self.assertRaises(TyrantError, lambda:self.p.vsiz("not_exists"))
+        self.assertRaises(exceptions.InvalidOperation, lambda:self.p.vsiz("not_exists"))
 
     def test_iter(self):
         self.test_add_item()
         self.p.iterinit()
         assert self.p.iternext() in ("foo", "fox")
         assert self.p.iternext() in ("foo", "fox")
-        self.assertRaises(TyrantError, self.p.iternext) #Cursor exhausted
+        self.assertRaises(exceptions.InvalidOperation, self.p.iternext) #Cursor exhausted
 
     def test_fwmkeys(self):
         self.test_add_item()

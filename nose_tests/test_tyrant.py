@@ -12,7 +12,8 @@ import unittest
 from nose import *
 
 # the app
-from pyrant import TyrantError, Tyrant
+from pyrant import Tyrant
+from pyrant import exceptions
 
 
 class TestTyrant(unittest.TestCase):
@@ -21,7 +22,7 @@ class TestTyrant(unittest.TestCase):
     TYRANT_FILE = os.path.abspath('test123.tct')
     TYRANT_PID = os.path.abspath('test123.pid')
     TYRANT_LUA = os.path.dirname(__file__) + '/test.lua'
-    
+
     def setUp(self):
         assert not os.path.exists(self.TYRANT_FILE), 'Cannot proceed if test database already exists'
         cmd = 'ttserver -dmn -host %(host)s -port %(port)s -pid %(pid)s -ext %(lua)s %(file)s'
@@ -89,7 +90,8 @@ class TestTyrant(unittest.TestCase):
 
     def test_call_func(self):
         assert self.t.call_func("test_ext", "key", "value") == u"test: key=value"
-        self.assertRaises(TyrantError, lambda:self.t.call_func("invented_function", "key", "value"))
+        fake_func = lambda: self.t.call_func("invented_function", "key", "value")
+        self.assertRaises(exceptions.InvalidOperation, fake_func)
 
     def test_clear(self):
         assert len(self.t) == 6
@@ -189,12 +191,12 @@ class TestTyrant(unittest.TestCase):
         item_with_unicode_key = {u'имя': 'Andrey'}
         ascii_pk = 'primary key'
         unicode_pk = u'первичный ключ'
-        
+
         self.t[ascii_pk] = item_with_unicode_value
         assert self.t[ascii_pk] == item_with_unicode_value
-        
+
         self.t[ascii_pk] = item_with_unicode_key
         assert self.t[ascii_pk] == item_with_unicode_key
-        
+
         self.t[unicode_pk] = item_with_unicode_value
         assert self.t[unicode_pk] == item_with_unicode_value

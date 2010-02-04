@@ -3,8 +3,20 @@
 from protocol import DB_TABLE, TABLE_COLUMN_SEP
 
 
+def from_python(value):
+    """
+    Returns value prepared for storage. This is required for search because
+    some Python types cannot be converted to string and back without changes
+    in semantics, e.g. True-->"True"-->True and False-->"False"-->True.
+    """
+    if isinstance(value, bool):
+        return 1 if value else ''
+    return value
+
 def to_python(elem, dbtype, sep=None):
-    """Returns pythonic representation of a database record."""
+    """
+    Returns pythonic representation of a database record.
+    """
     if dbtype == DB_TABLE:
         # Split element by \x00 which is the column separator
         elems = elem.split(TABLE_COLUMN_SEP)
@@ -12,7 +24,7 @@ def to_python(elem, dbtype, sep=None):
             return dict((elems[i], elems[i+1]) for i in xrange(0, len(elems), 2))
         else:
             return
-    
+
     if sep and sep in elem:
         return elem.split(sep)
 

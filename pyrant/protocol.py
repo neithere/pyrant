@@ -8,7 +8,7 @@ import math
 import socket
 import struct
 
-from exceptions import TyrantError
+import exceptions
 
 
 # Pyrant constants
@@ -84,7 +84,7 @@ class _TyrantSocket(object):
 
         fail_code = ord(self.get_byte())
         if fail_code:
-            raise TyrantError(fail_code)
+            raise exceptions.get_for_code(fail_code)
 
     def recv(self, bytes):
         """
@@ -150,9 +150,9 @@ class TyrantProtocol(object):
     A straightforward implementation of the Tokyo Tyrant protocol. Provides all
     low level constants and operations. Provides a level of abstraction that is
     just enough to communicate with server from Python using Tyrant API.
-    
+
     More sophisticated APIs can be built on top of this class. Two of them are
-    included in pyrant: the dict-like API (:class:`~pyrant.Pyrant`) and the 
+    included in pyrant: the dict-like API (:class:`~pyrant.Pyrant`) and the
     query API (:class:`~pyrant.query.Query`).
     """
 
@@ -319,8 +319,8 @@ class TyrantProtocol(object):
 
     def iternext(self):
         """
-        Returns the next key after ``iterinit`` call. Raises
-        :class:`~pyrant.protocol.TyrantError` on iteration end.
+        Returns the next key after ``iterinit`` call. Raises an exception which
+        is subclass of :class:`~pyrant.protocol.TyrantError` on iteration end.
         """
         self._sock.send(self.ITERNEXT)
         return self._sock.get_unicode()
@@ -418,7 +418,7 @@ class TyrantProtocol(object):
                ms_conditions=None, ms_type=None, columns=None,
                out=False, count=False, hint=False):
         """
-        Returns list of keys for elements matching given ``conditions``. 
+        Returns list of keys for elements matching given ``conditions``.
 
         :param conditions: a list of tuples in the form ``(column, op, expr)``
             where `column` is name of a column and `op` is operation code (one of
@@ -449,8 +449,8 @@ class TyrantProtocol(object):
         assert offset is None or 0 <= offset, 'wrong offset value "%s"' % offset
         assert ms_type in (None, self.TDBMSUNION, self.TDBMSISECT, self.TDBMSDIFF)
         assert order_type in (self.RDBQOSTRASC, self.RDBQOSTRDESC,
-                              self.RDBQONUMASC, self.RDBQONUMDESC) 
-        
+                              self.RDBQONUMASC, self.RDBQONUMDESC)
+
         # conditions
         args = ['addcond\x00%s\x00%d\x00%s' % cond for cond in conditions]
 
