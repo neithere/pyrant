@@ -270,6 +270,7 @@ class Query(object):
 
             * `between`: (list of numbers)
             * `contains`: (string or list of strings)
+            * `contains_any` (list of strings)
             * `endswith`: (string)
             * `exists`: (boolean)
             * `gt`: (number)
