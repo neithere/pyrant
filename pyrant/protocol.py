@@ -14,6 +14,7 @@ import exceptions
 # Pyrant constants
 MAGIC_NUMBER = 0xc8
 ENCODING = 'UTF-8'
+ENCODING_ERROR_HANDLING = 'strict'    # set to 'replace' or 'ignore' if needed
 
 # Table Types
 DB_BTREE  = 'B+ tree'
@@ -126,7 +127,7 @@ class _TyrantSocket(object):
         Retrieves a unicode string from the socket and returns it. This method
         uses :meth:`get_str`, which in turn makes use of :meth:`get_int`.
         """
-        return self.get_str().decode(ENCODING)
+        return self.get_str().decode(ENCODING, ENCODING_ERROR_HANDLING)
 
     def get_double(self):
         """
