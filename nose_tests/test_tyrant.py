@@ -112,11 +112,37 @@ class TestTyrant(unittest.TestCase):
 
     def test_iterkeys(self):
         keys = set("apple blueberry peach pear raspberry strawberry".split())
-        db_keys = set([key for key in self.t.iterkeys()])
+        g = self.t.iterkeys()
+        assert hasattr(g, '__iter__')
+        assert not hasattr(g, '__len__')
+        db_keys = set([key for key in g])
         assert keys == db_keys
 
     def test_keys(self):
         assert self.t.keys() == "apple blueberry peach pear raspberry strawberry".split() #BTree and Tables are ordered
+
+    def test_iteritems(self):
+        g = self.t.iteritems()
+        assert hasattr(g, '__iter__')
+        assert not hasattr(g, '__len__')
+        lst = list(g)
+        assert len(lst) == 6
+        assert 'apple' in dict(lst)
+
+    def test_items(self):
+        assert dict(self.t.iteritems()) == dict(self.t.items())
+
+    def test_itervalues(self):
+        g = self.t.itervalues()
+        assert hasattr(g, '__iter__')
+        assert not hasattr(g, '__len__')
+        lst = list(g)
+        assert len(lst) == 6
+        assert 'color' in lst[0]
+        assert lst[0]['color'] == 'red'
+
+    def test_values(self):
+        assert dict(self.t.itervalues()) == dict(self.t.values())
 
     def test_update(self):
         assert "melon" not in self.t

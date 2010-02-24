@@ -25,9 +25,8 @@ DB_HASH   = 'hash'
 TABLE_COLUMN_SEP = '\x00'
 
 def _ulen(expr):
-    return len(expr.encode(ENCODING)) \
-            if isinstance(expr, unicode) else len(expr)
-
+    "Returns length of the string in bytes."
+    return len(expr.encode(ENCODING)) if isinstance(expr, unicode) else len(expr)
 
 def _pack(code, *args):
     # Craft string that we'll use to send data based on args type and content

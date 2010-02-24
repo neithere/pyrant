@@ -35,7 +35,7 @@ import query
 import utils
 
 
-__version__ = '0.1.2'
+__version__ = '0.2.0'
 __all__ = ['Tyrant']
 
 
@@ -44,7 +44,7 @@ DEFAULT_HOST = '127.0.0.1'
 DEFAULT_PORT = 1978
 
 
-class Tyrant(dict):
+class Tyrant(object):
     """A Python dictionary API for Tokyo Tyrant.
 
     :param host: Tyrant host address
@@ -110,21 +110,18 @@ class Tyrant(dict):
         Sets given value for given primary key in the database.
         Additional types conversion is only done if the value is a dictionary.
         """
-
         if isinstance(value, dict):
-            pairs = ((k, utils.from_python(v)) for k,v in value.iteritems())
-            flat_pairs = _itertools.chain(*pairs)
-            args = [key] + list(flat_pairs)
+            flat = list(_itertools.chain(*((k, utils.from_python(v)) for
+                                            k,v in value.iteritems())))
+            args = [key] + flat
             self.proto.misc('put', args)
-
-        elif isinstance(value, (list, tuple)):
-            assert self.separator, "Separator is not set"
-
-            flat = self.separator.join(value)
-            self.proto.put(key, flat)
-
         else:
-            self.proto.put(key, value)
+            if isinstance(value, (list, tuple)):
+                assert self.separator, "Separator is not set"
+                prepared_value = self.separator.join(value)
+            else:
+                prepared_value = value
+            self.proto.put(key, prepared_value)
 
 
     def call_func(self, func, key, value, record_locking=False,
@@ -184,6 +181,35 @@ class Tyrant(dict):
         Returns the list of keys in the database.
         """
         return list(self.iterkeys())
+
+    def itervalues(self):
+        for key in self.iterkeys():
+            yield self[key]
+
+    def values(self):
+        return list(self.itervalues())
+
+    def iteritems(self):
+        for key in self.iterkeys():
+            yield key, self[key]
+
+    def items(self):
+        return list(self.iteritems())
+
+    def has_key(self, key):
+        return key in self
+
+    def setdefault(self, key, value):
+        """
+        >>> t['foo'] = 'old'
+        'old'
+        >>> t['foo'] = 'new'
+        'old'
+
+        """
+        if not key in self:
+            self[key] = value
+        return self[key]
 
     def update(self, mapping=None, **kwargs):
         """

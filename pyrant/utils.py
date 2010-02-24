@@ -8,6 +8,9 @@ def from_python(value):
     Returns value prepared for storage. This is required for search because
     some Python types cannot be converted to string and back without changes
     in semantics, e.g. True-->"True"-->True and False-->"False"-->True.
+
+    Note that we don't convert the value to bytes here, it's done by
+    pyrant.protocol._pack.
     """
     if isinstance(value, bool):
         return 1 if value else ''
