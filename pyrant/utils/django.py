@@ -45,7 +45,8 @@ def prepare_django_object(instance, renamings=None):
 
         # value conversion
         if field_meta and field_meta.rel:
-            data[key] = make_pk(field_meta.rel.to._meta.object_name, value)
+            if value:
+                data[key] = make_pk(field_meta.rel.to._meta.object_name, value)
         else:
             data[key] = '' if value is None else unicode(value)
     return data
