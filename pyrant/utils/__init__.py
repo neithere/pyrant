@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from protocol import DB_TABLE, TABLE_COLUMN_SEP
+from pyrant.protocol import DB_TABLE, TABLE_COLUMN_SEP
 
 
 def from_python(value):
