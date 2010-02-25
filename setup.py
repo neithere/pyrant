@@ -18,7 +18,7 @@ The setup and build script for the pyrant library.
 """
 
 import os
-from setuptools import setup
+from setuptools import setup, find_packages
 
 import pyrant
 
@@ -33,7 +33,7 @@ setup(
     long_description = readme,
     author = 'Martin Conte Mac Donell',
     author_email = 'Reflejo@gmail.com',
-    packages = ['pyrant'],
+    packages = find_packages(),
     install_requires = ['setuptools'],
     include_package_data = True,
     classifiers = [
