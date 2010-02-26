@@ -39,8 +39,8 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'pyrant'
-copyright = u'2009, Bob Ippolito, Martin Conte Mac Donell, Andy Mikhailenko'
+project = u'Pyrant'
+copyright = u'2008-2009 Bob Ippolito, 2009 Martin Conte Mac Donell, 2009-2010 Andy Mikhailenko'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -66,7 +66,7 @@ release = pyrant.__version__
 
 # List of directories, relative to source directory, that shouldn't be searched
 # for source files.
-exclude_trees = ['_build']
+exclude_trees = ['build']
 
 # The reST default role (used for this markup: `text`) to use for all documents.
 #default_role = None
@@ -93,7 +93,7 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  Major themes that come with
 # Sphinx are currently 'default' and 'sphinxdoc'.
-html_theme = 'default'
+html_theme = 'nature'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -174,7 +174,7 @@ htmlhelp_basename = 'pyrantdoc'
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass [howto/manual]).
 latex_documents = [
-  ('index', 'pyrant.tex', u'pyrant Documentation',
+  ('index', 'pyrant.tex', u'Pyrant Documentation',
    u'Bob Ippolito, Martin Conte Mac Donell, Andy Mikhailenko', 'manual'),
 ]
 
