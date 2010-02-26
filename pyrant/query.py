@@ -17,9 +17,16 @@ MAX_RESULTS = 1000
 class Query(object):
     """
     A lazy abstraction for queries via Tyrant protocol.
+
+    You will normally instantiate Query this way::
+
+        >>> from pyrant import Tyrant
+        >>> t = Tyrant(host='localhost', port=1983)
+        >>> query = t.query
+
     """
 
-    def __init__(self, proto, dbtype, literal=False, conditions=None,
+    def __init__(self, proto, db_type, literal=False, conditions=None,
                  columns=None, ms_type=None, ms_conditions=None):
         if conditions:
             assert isinstance(conditions, list) and \
@@ -30,7 +37,7 @@ class Query(object):
         self._ordering = Ordering()
         self._cache = {}
         self._proto = proto
-        self._dbtype = dbtype
+        self._db_type = db_type
         self._columns = columns
         self._ms_type = ms_type
         self._ms_conditions = ms_conditions
@@ -140,7 +147,7 @@ class Query(object):
         if self._columns:
             defaults.update(columns=self._columns[:])
 
-        return Query(self._proto, self._dbtype, **defaults)
+        return Query(self._proto, self._db_type, **defaults)
 
     def _do_search(self, conditions=None, limit=None, offset=None,
                    out=False, count=False, hint=False):
@@ -194,7 +201,7 @@ class Query(object):
 
     def _to_python(self, key):
         elem = self._proto.get(key, self.literal)
-        elem = utils.to_python(elem, self._dbtype)
+        elem = utils.to_python(elem, self._db_type)
         return key, elem
 
     def _to_python_dict(self, val):
@@ -288,44 +295,41 @@ class Query(object):
         If a column name is provided with no lookup, exact match (`is`) is
         assumed.
 
-        Usage::
+        Connect to a remote table database::
 
-            connect to a remote table database:
+            >>> t.table_enabled
+            True
 
-            >>> t = Tyrant()
-            >>> t.get_stats()['type']
-            u'table'
-
-            stuff some data into the storage:
+        Stuff some data into the storage::
 
             >>> t['a'] = {'name': 'Foo', 'price': 1}
             >>> t['b'] = {'name': 'Bar', 'price': 2}
             >>> t['c'] = {'name': 'Foo', 'price': 3}
 
-            find everything with price > 1:
+        Find everything with price > 1::
 
-            >>> for x in t.query.filter(price__gt=1):
-            ...     print x[0]
+            >>> for k, v in t.query.filter(price__gt=1):
+            ...     print k
             b
             c
 
-            find everything with name "Foo":
+        Find everything with name "Foo"::
 
-            >>> for x in t.query.filter(name='Foo'):
-            ...     print x
+            >>> for k, v in t.query.filter(name='Foo'):
+            ...     print k
             a
             c
 
-            chain queries:
+        Chain queries::
 
             >>> cheap_items = t.query.filter(price__lt=3)
             >>> cheap_bars = cheap_items.filter(name='Bar')
-            >>> for x in cheap_items:
-            ...     print x
+            >>> for k, v in cheap_items:
+            ...     print k
             a
             b
-            >>> for x in cheap_bars:
-            ...     print x
+            >>> for k, v in cheap_bars:
+            ...     print k
             b
 
         """

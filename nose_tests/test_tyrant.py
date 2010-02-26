@@ -12,8 +12,7 @@ import unittest
 from nose import *
 
 # the app
-from pyrant import Tyrant
-from pyrant import exceptions
+from pyrant import Tyrant, exceptions, protocol
 
 
 class TestTyrant(unittest.TestCase):
@@ -108,7 +107,9 @@ class TestTyrant(unittest.TestCase):
     def test_get_stats(self):
         stats = self.t.get_stats()
         assert stats["rnum"] == "6"
-        assert stats["type"] == "table"
+        assert stats["type"] == protocol.DB_TABLE
+        assert self.t.db_type == protocol.DB_TABLE
+        assert self.t.table_enabled == True
 
     def test_iterkeys(self):
         keys = set("apple blueberry peach pear raspberry strawberry".split())

@@ -12,13 +12,14 @@ More information about Tokyo Tyrant:
 Usage example (note the automatically managed support for table database)::
 
     >>> import pyrant
-    >>> t = pyrant.Tyrant(host='127.0.0.1', port=1983)    # default port is 1978
-    >>> if t.dbtype != pyrant.DBTYPETABLE:
-    ...     t['key'] = 'foo'
-    ...     print t['key']
-    ... else:
+    >>> TEST_HOST, TEST_PORT = '127.0.0.1', 1983
+    >>> t = pyrant.Tyrant(host=TEST_HOST, port=TEST_PORT)    # default port is 1978
+    >>> if t.table_enabled:
     ...     t['key'] = {'name': 'foo'}
     ...     print t['key']['name']
+    ... else:
+    ...     t['key'] = 'foo'
+    ...     print t['key']
     foo
     >>> del t['key']
     >>> print t['key']
@@ -35,7 +36,7 @@ import query
 import utils
 
 
-__version__ = '0.3.2'
+__version__ = '0.3.3'
 __all__ = ['Tyrant']
 
 
@@ -49,8 +50,39 @@ class Tyrant(object):
 
     :param host: Tyrant host address
     :param port: Tyrant port number
-    :param separator: if set, will be used to get/put lists as values
-    :param literal: if set, returned data is not encoded to Unicode
+    :param separator: if set, will be used to get/put lists as values. For table
+        databases the separator applies to column values.
+    :param literal: if set, returned data is not encoded to Unicode (default is
+        False)
+
+    Usage::
+
+        >>> import pyrant
+        >>> t = pyrant.Tyrant(host=TEST_HOST, port=TEST_PORT)
+
+        # remove anything that could be left from previous time
+        >>> t.clear()
+
+        # make sure there are zero records in the database
+        >>> len(t)
+        0
+
+    :class:`Tyrant` provides pythonic syntax and data pythonification, while the
+    the lower-lever :class:`~pyrant.protocol.TyrantProtocol` closely follows the
+    orginal Tokyo Tyrant API and only converts incoming data to strings
+    (Unicode). You decide which to use. Generally you would want more pythonic
+    API (:class:`Tyrant`) for most cases and the lower-level interface to reduce
+    overhead or to fix broken data which cannot be properly converted by means
+    of the higher-level API.
+
+    It is also important that Tokyo Cabinet has a great query extension for table
+    databases. This extension is supported by :class:`pyrant.query.Query` which
+    only requires :class:`~pyrant.protocol.TyrantProtocol` to work and can be
+    easily accessed via :attr:`Tyrant.query`::
+
+        >>> t.query
+        []
+
     """
 
     def __init__(self, host=DEFAULT_HOST, port=DEFAULT_PORT, separator=None,
@@ -60,10 +92,11 @@ class Tyrant(object):
         """
         # keep the protocol public just in case anyone needs a specific option
         self.proto = protocol.TyrantProtocol(host, port)
-        self.dbtype = self.get_stats()['type']
+
         self.separator = separator
-        if not separator and self.dbtype == "table":
+        if not separator and self.table_enabled:
             self.separator = protocol.TABLE_COLUMN_SEP
+
         self.literal = literal
 
     def __contains__(self, key):
@@ -83,7 +116,7 @@ class Tyrant(object):
     def __getitem__(self, key):
         try:
             elem = self.proto.get(key, self.literal)
-            return utils.to_python(elem, self.dbtype, self.separator)
+            return utils.to_python(elem, self.db_type, self.separator)
         except exceptions.TyrantError:
             raise KeyError(key)
 
@@ -123,6 +156,26 @@ class Tyrant(object):
                 prepared_value = value
             self.proto.put(key, prepared_value)
 
+    @property
+    def db_type(self):
+        stats = self.get_stats()
+        assert 'type' in stats and stats['type'], ('statistics must provide a '
+                                                   'valid database type')
+        return stats['type']
+
+    @property
+    def db_path(self):
+        stats = self.get_stats()
+        assert 'path' in stats, 'statistics must provide a database path'
+        return stats['path']
+
+    @property
+    def table_enabled(self):
+        """
+        Returns True is current database type is TDB so TDB-specific extensions
+        are enabled.
+        """
+        return self.db_type == protocol.DB_TABLE
 
     def call_func(self, func, key, value, record_locking=False,
                   global_locking=False):
@@ -201,10 +254,10 @@ class Tyrant(object):
 
     def setdefault(self, key, value):
         """
-        >>> t['foo'] = 'old'
-        'old'
-        >>> t['foo'] = 'new'
-        'old'
+        >>> t.setdefault('foo', {'one': 'one'})
+        {u'one': u'one'}
+        >>> t.setdefault('foo', {'two': 'two'})
+        {u'one': u'one'}
 
         """
         if not key in self:
@@ -250,7 +303,7 @@ class Tyrant(object):
             return rval
 
         # 1.1.11 protocol returns interleaved key, value list
-        d = dict((rval[i], utils.to_python(rval[i + 1], self.dbtype, self.separator))
+        d = dict((rval[i], utils.to_python(rval[i + 1], self.db_type, self.separator))
                     for i in xrange(0, len(rval), 2))
         return d
 
@@ -298,4 +351,7 @@ class Tyrant(object):
         """
         Returns a :class:`~pyrant.Query` object for the database.
         """
-        return query.Query(self.proto, self.dbtype, self.literal)
+        if not self.table_enabled:
+            raise TypeError('Query only works with table databases but %s is a '
+                            '%s database.' % (self.db_path, self.db_type))
+        return query.Query(self.proto, self.db_type, self.literal)

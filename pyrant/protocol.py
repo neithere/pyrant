@@ -1,7 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Protocol implementation for `Tokyo Tyrant
-<http://tokyocabinet.sourceforge.net/tyrantdoc/>`_.
+Protocol implementation for `Tokyo Tyrant <http://1978th.net/tokyotyrant/>`_.
+
+Let's assume some defaults for our sandbox::
+
+    >>> TEST_HOST = '127.0.0.1'
+    >>> TEST_PORT = 1983    # default port is 1978
+
 """
 
 import math
@@ -154,6 +159,19 @@ class TyrantProtocol(object):
     More sophisticated APIs can be built on top of this class. Two of them are
     included in pyrant: the dict-like API (:class:`~pyrant.Pyrant`) and the
     query API (:class:`~pyrant.query.Query`).
+
+    Let's connect to a sanbdox Tyrant server::
+
+        >>> from pyrant import protocol
+        >>> p = protocol.TyrantProtocol(host=TEST_HOST, port=TEST_PORT)
+
+        # remove anything that could be left from previous time
+        >>> p.vanish()
+
+        # make sure there are zero records in the database
+        >>> p.rnum()
+        0
+
     """
 
     # Protocol commands
@@ -235,7 +253,15 @@ class TyrantProtocol(object):
 
     def put(self, key, value):
         """
-        Unconditionally sets key to value.
+        Unconditionally sets key to value::
+
+            >>> p.put(u'foo', u'bar\x00baz')
+            >>> p.rnum()
+            1
+            >>> p.put('fox', u'box\x00quux')
+            >>> p.rnum()
+            2
+
         """
         self._sock.send(self.PUT, _ulen(key), _ulen(value), key, value)
 
@@ -277,7 +303,13 @@ class TyrantProtocol(object):
 
     def get(self, key, literal=False):
         """
-        Returns the value of `key` as stored on the server.
+        Returns the value of `key` as stored on the server::
+
+            >>> p.get(u'foo')
+            u'bar\x00baz'
+            >>> p.get(u'fox')
+            u'box\x00quux'
+
         """
         self._sock.send(self.GET, _ulen(key), key)
         return self._sock.get_str() if literal else self._sock.get_unicode()
@@ -298,7 +330,12 @@ class TyrantProtocol(object):
 
     def mget(self, klst):
         """
-        Returns key,value pairs from the server for the given list of keys.
+        Returns key,value pairs from the server for the given list of keys::
+
+            >>> p.mget(['foo', 'fox'])
+            [('foo', 'bar\x00baz'), ('fox', 'box\x00quux')]
+
+
         """
         self._sock.send(self.MGET, len(klst), klst)
         numrecs = self._sock.get_int()
@@ -314,13 +351,27 @@ class TyrantProtocol(object):
     def iterinit(self):
         """
         Begins iteration over all keys of the database.
+
+            >>> p.iterinit()    # now we can call iternext()
+
         """
         self._sock.send(self.ITERINIT)
 
     def iternext(self):
         """
         Returns the next key after ``iterinit`` call. Raises an exception which
-        is subclass of :class:`~pyrant.protocol.TyrantError` on iteration end.
+        is subclass of :class:`~pyrant.protocol.TyrantError` on iteration end::
+
+            # here we assume that iterinit() was already called
+            >>> p.iternext()
+            u'foo'
+            >>> p.iternext()
+            u'fox'
+            >>> p.iternext()
+            Traceback (most recent call last):
+                ...
+            InvalidOperation
+
         """
         self._sock.send(self.ITERNEXT)
         return self._sock.get_unicode()

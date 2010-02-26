@@ -18,6 +18,7 @@ class TestProtocol(unittest.TestCase):
     TYRANT_FILE_COPY = os.path.abspath('test321.tct')
     TYRANT_PID = os.path.abspath('test123.pid')
     TYRANT_LUA = os.path.dirname(__file__) + '/test.lua'
+
     def setUp(self):
         assert not os.path.exists(self.TYRANT_FILE), 'Cannot proceed if test database already exists'
         cmd = 'ttserver -dmn -host %(host)s -port %(port)s -pid %(pid)s -ext %(lua)s %(file)s'
@@ -25,7 +26,7 @@ class TestProtocol(unittest.TestCase):
                 'pid': self.TYRANT_PID, 'file': self.TYRANT_FILE, 'lua': self.TYRANT_LUA}
         os.popen(cmd).read()
         self.p = protocol.TyrantProtocol(host=self.TYRANT_HOST, port=self.TYRANT_PORT)
-        self.p.vanish()  #XXX: Why this is needed?
+        self.p.vanish()
 
     def tearDown(self):
         cmd = 'ps -e -o pid,command | grep "ttserver" | grep "\-port %s"' % self.TYRANT_PORT

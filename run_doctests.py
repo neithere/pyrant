@@ -7,12 +7,12 @@ import unittest
 import doctest
 
 
-TESTS_DIRS = ('test',)# 'pyrant')
+TESTS_DIRS = ('pyrant',)
 
 # A sandbox Tyrant instance parametres:
 TYRANT_HOST = '127.0.0.1'
 TYRANT_PORT = '1983'    # default is 1978 so we avoid clashes
-TYRANT_FILE = os.path.abspath('test123.tct')   # NOTE: this file will be purged during testing!
+TYRANT_FILE = os.path.abspath('test123.tct')
 TYRANT_PID  = os.path.abspath('test123.pid')
 
 
@@ -36,9 +36,10 @@ def _stop_tyrant():
     if __debug__:
         print 'Sandbox Tyrant stopped.'
 
-    os.unlink(TYRANT_FILE)
-    if __debug__:
-        print 'Sandbox database %s deleted.' % TYRANT_FILE
+    if os.path.exists(TYRANT_FILE):
+        os.unlink(TYRANT_FILE)
+        if __debug__:
+            print 'Sandbox database %s deleted.' % TYRANT_FILE
 
 def _add_files_to(suite):
     def _inner(_, dirname, fnames):
@@ -49,6 +50,7 @@ def _add_files_to(suite):
     return _inner
 
 def _test():
+
     # run the sandbox Tyrant instance
     _start_tyrant()
 
