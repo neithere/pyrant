@@ -563,7 +563,7 @@ class Condition(object):
             if definition.accepts(self.expr):
                 try:
                     value = definition.validate(self.expr)
-                except ValueError as e:
+                except ValueError, e:
                     raise ValueError(u'Bad lookup %s__%s=%s: %s' % (
                                      self.name,
                                      self.lookup,
