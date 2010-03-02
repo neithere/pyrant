@@ -64,8 +64,10 @@ class _TyrantSocket(object):
     Socket logic. We use this class as a wrapper to raw sockets.
     """
 
-    def __init__(self, host, port):
+    def __init__(self, host, port, timeout=None):
         self._sock = socket.socket()
+        if not timeout is None:
+            self._sock.settimeout(timeout)
         self._sock.connect((host, port))
         self._sock.setsockopt(socket.SOL_TCP, socket.TCP_NODELAY, 1)
 
@@ -233,8 +235,8 @@ class TyrantProtocol(object):
     RDBXOLCKREC = 1    # record locking
     RDBXOLCKGLB = 2    # global locking
 
-    def __init__(self, host, port):
-        self._sock = _TyrantSocket(host, port)
+    def __init__(self, host, port, timeout=None):
+        self._sock = _TyrantSocket(host, port, timeout)
 
     def put(self, key, value):
         """
