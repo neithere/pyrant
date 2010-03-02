@@ -93,7 +93,10 @@ class _TyrantSocket(object):
         """
         d = ''
         while len(d) < bytes:
-            d += self._sock.recv(min(8192, bytes - len(d)))
+            c = self._sock.recv(min(8192, bytes - len(d)))
+            if not c:
+                raise socket.error('server disconnected unexpectedly')
+            d += c
         return d
 
     def get_byte(self):
