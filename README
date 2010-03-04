@@ -3,11 +3,12 @@ Pyrant
 
 Pyrant is a Python wrapper around Tokyo Tyrant. It provides:
 
-* `pyrant.protocol` is a not-too-pythonic implementation of the Tyrant protocol. It
-  supports the table database and all Tyrant features but does not attempt to do
-  anything else;
+* `pyrant.protocol` is a not-too-pythonic implementation of the Tyrant
+  protocol. It supports the table database and all Tyrant features but does not
+  attempt to do anything else;
 * `pyrant.Tyrant` is a higher-level pythonic dict-like API;
-* `pyrant.query` is a high-level API for complex queries (inspired by Django ORM).
+* `pyrant.query` is a high-level API for complex queries (inspired by Django
+  ORM).
 
 Usually you will only want to use the `Tyrant` class because it is built on top
 of the `protocol` module and provides access to it and to the query API.
