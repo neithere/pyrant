@@ -12,5 +12,28 @@ Rewritten as Pyrant by:
 
 Extended, tested, polished and otherwise improved by:
 
-    * Andy Mikhailenko <andy@neithere.net>
+    * Andrey Mikhaylenko <http://neithere.net>
     * lasizoillo
+    * Eivind Uggedal <http://uggedal.com>
+
+History notes
+-------------
+
+The lists above are incomplete because it is difficult to track all
+contributions to PyTyrant and derivative works due to the nature of their
+development process. Some people submitted bug tickets and patches to
+PyTyrant[1] which was meanwhile forked to support tables. (We refer to that fork
+as "PyTableTyrant" because it introduced a class of the same name though
+retained the project name PyTyrant.) The latter fork spawned a cloud of its own
+forks[2] that were never completely synchronized. Even the PyTableTyrant was
+not merged back into PyTyrant. Pyrant, in turn, was a rewrite[3] which included
+ideas and some pieces of code from the above-mentioned projects but did not
+inherit their commit history so it is hard to tell on which revision it was
+primarily based and whose ideas and patches influenced its progress.
+
+Please refer to the revision logs and the bug trackers of the original projects
+to gather complete information on contributions.
+
+[1] http://code.google.com/p/pytyrant/issues/list
+[2] http://github.com/ericflo/pytyrant/network
+[3] http://code.google.com/p/pytyrant/issues/detail?id=5#c17
