@@ -36,9 +36,9 @@ Models (schemata)
 -----------------
 
 Pyrant itself does not provide means for defining models, but our related project
-`Models`_ allows to do that easily.
+`PyModels`_ allows to do that easily.
 
-  .. _Models: http://pypi.python.org/pypi/models/
+  .. _PyModels: http://pypi.python.org/pypi/pymodels/
 
 Community
 ---------
