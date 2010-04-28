@@ -253,6 +253,16 @@ class TyrantProtocol(object):
     RDBXOLCKREC = 1    # record locking
     RDBXOLCKGLB = 2    # global locking
 
+    # Index types (for table databases)
+
+    TDBITLEXICAL = 0    # lexical string
+    TDBITDECIMAL = 1 # decimal string
+    TDBITTOKEN = 2 # token inverted index
+    TDBITQGRAM = 3 # q-gram inverted index
+    TDBITOPT = 9998 # optimize index
+    TDBITVOID = 9999 # remove index
+    TDBITKEEP = 1 << 24 # keep existing index
+
     def __init__(self, host, port, timeout=None):
         # connect to the remote database
         self._sock = _TyrantSocket(host, port, timeout)
@@ -337,16 +347,15 @@ class TyrantProtocol(object):
         """
         return self.adddouble(key)
 
-    def mget(self, klst):
+    def mget(self, keys):
         """
         Returns key,value pairs from the server for the given list of keys::
 
             >>> p.mget(['foo', 'fox'])
             [('foo', 'bar\x00baz'), ('fox', 'box\x00quux')]
 
-
         """
-        self._sock.send(self.MGET, len(klst), klst)
+        self._sock.send(self.MGET, len(keys), keys)
         numrecs = self._sock.get_int()
         return [self._sock.get_strpair() for i in xrange(numrecs)]
 
@@ -459,6 +468,63 @@ class TyrantProtocol(object):
         self._sock.send(self.RNUM)
         return self._sock.get_long()
 
+    def setindex(self, name, kind=None, keep=False):
+        """
+        Sets index on given column. Returns `True` if index was successfully
+        created.
+
+        :param name: column name for which index should be set.
+        :param kind: index type, one of: `lexical`, `decimal`, `token`,
+            `q-gram`.
+        :param keep: if True, index is only created if it did not yet exist.
+            Default is False, i.e. any existing index is reset.
+
+        """
+        # TODO: replace "kind" with keyword arguments
+        TYPES = {
+            'lexical': self.TDBITLEXICAL,
+            'decimal': self.TDBITDECIMAL,
+            'token':   self.TDBITTOKEN,
+            'q-gram':  self.TDBITQGRAM,
+        }
+        kind = 'lexical' if kind is None else kind
+        assert kind in TYPES, 'unknown index type "%s"' % kind
+        type_code = TYPES[kind]
+        if keep:
+            type_code |= self.TDBITKEEP
+        try:
+            self.misc('setindex', [name, type_code])
+        except exceptions.InvalidOperation:
+            return False
+        else:
+            return True
+
+    def optimize_index(self, name):
+        """
+        Optimizes index for given column. Returns `True` if the operation was
+        successfully performed. In most cases the operation fails when the
+        index does not exist.
+        """
+        try:
+            self.misc('setindex', [name, self.TDBITOPT])
+        except exceptions.InvalidOperation:
+            return False
+        else:
+            return True
+
+    def drop_index(self, name):
+        """
+        Removes index for given column. Returns `True` if the operation was
+        successfully performed. In most cases the operation fails when the
+        index does not exist.
+        """
+        try:
+            self.misc('setindex', [name, self.TDBITVOID])
+        except exceptions.InvalidOperation:
+            return False
+        else:
+            return True
+
     def size(self):
         """
         Returns the size of the database in bytes.
@@ -492,7 +558,8 @@ class TyrantProtocol(object):
         :param order_type: one of TyrantProtocol.RDBQO[...]; if defined along
             with `order_column`, results are sorted by the latter using given
             method. Default is RDBQOSTRASC.
-        :param opts:
+        :param opts: a bitflag (see
+            :meth:`~pyrant.protocol.TyrantProtocol.misc`
         :param ms_conditions: MetaSearch conditions.
         :param ms_type: MetaSearch operation type.
         :param columns: iterable; if not empty, returns only given columns for
@@ -507,6 +574,9 @@ class TyrantProtocol(object):
         # sanity check
         assert limit  is None or 0 <= limit, 'wrong limit value "%s"' % limit
         assert offset is None or 0 <= offset, 'wrong offset value "%s"' % offset
+        if offset and not limit:
+            # this is required by TDB API. Could be worked around somehow?
+            raise ValueError('Offset cannot be specified without limit.')
         assert ms_type in (None, self.TDBMSUNION, self.TDBMSISECT, self.TDBMSDIFF)
         assert order_type in (self.RDBQOSTRASC, self.RDBQOSTRDESC,
                               self.RDBQONUMASC, self.RDBQONUMDESC)
@@ -531,6 +601,8 @@ class TyrantProtocol(object):
 
         # set limit and offset
         if limit:   # and 0 <= offset:
+            # originally this is named setlimit(max,skip).
+            # it is *not* possible to specify offset without limit.
             args += ['setlimit\x00%d\x00%d' % (limit, offset)]
 
         # drop all records yielded by the query
