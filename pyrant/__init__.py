@@ -136,7 +136,7 @@ class Tyrant(object):
         return self.proto.rnum()
 
     def __repr__(self):
-        return object.__repr__(self)
+        return u'<Tyrant %s:%s>' % (self.proto.host, self.proto.port)
 
     def __setitem__(self, key, value):
         """

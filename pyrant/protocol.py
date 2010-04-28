@@ -254,7 +254,11 @@ class TyrantProtocol(object):
     RDBXOLCKGLB = 2    # global locking
 
     def __init__(self, host, port, timeout=None):
+        # connect to the remote database
         self._sock = _TyrantSocket(host, port, timeout)
+        # expose connection info (not used internally)
+        self.host = host
+        self.port = port
 
     def put(self, key, value):
         """
