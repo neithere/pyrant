@@ -299,10 +299,11 @@ class TyrantProtocol(object):
 
     def putshl(self, key, value, width):
         """
-        Equivalent to:
+        Equivalent to::
 
             self.putcat(key, value)
             self.put(key, self.get(key)[-width:])
+
         """
         self._sock.send(self.PUTSHL, _ulen(key), _ulen(value), width, key,
                         value)
@@ -343,7 +344,7 @@ class TyrantProtocol(object):
     def getdouble(self, key):
         """
         Returns a double for given key. Value must be set by
-        :meth:`~pyrant.protocol.TyrantProtocol.adddouble`.
+        :meth:`~adddouble`.
         """
         return self.adddouble(key)
 
@@ -380,8 +381,7 @@ class TyrantProtocol(object):
         Returns the next key after ``iterinit`` call. Raises an exception which
         is subclass of :class:`~pyrant.protocol.TyrantError` on iteration end::
 
-            # here we assume that iterinit() was already called
-            >>> p.iternext()
+            >>> p.iternext()  # assume iterinit() was already called
             u'foo'
             >>> p.iternext()
             u'fox'
@@ -468,7 +468,7 @@ class TyrantProtocol(object):
         self._sock.send(self.RNUM)
         return self._sock.get_long()
 
-    def setindex(self, name, kind=None, keep=False):
+    def add_index(self, name, kind=None, keep=False):
         """
         Sets index on given column. Returns `True` if index was successfully
         created.
@@ -478,6 +478,11 @@ class TyrantProtocol(object):
             `q-gram`.
         :param keep: if True, index is only created if it did not yet exist.
             Default is False, i.e. any existing index is reset.
+
+        .. note:: we have chosen not to mimic the original API here because it
+            is a bit too confusing. Instead of a single cumbersome function
+            Pyrant provides three: :meth:`~add_index`, :meth:`~optimize_index`
+            and :meth:`~drop_index`. They all do what their names suggest.
 
         """
         # TODO: replace "kind" with keyword arguments
@@ -503,7 +508,7 @@ class TyrantProtocol(object):
         """
         Optimizes index for given column. Returns `True` if the operation was
         successfully performed. In most cases the operation fails when the
-        index does not exist.
+        index does not exist. You can add index using :meth:`~add_index`.
         """
         try:
             self.misc('setindex', [name, self.TDBITOPT])
@@ -516,7 +521,7 @@ class TyrantProtocol(object):
         """
         Removes index for given column. Returns `True` if the operation was
         successfully performed. In most cases the operation fails when the
-        index does not exist.
+        index doesn't exist. You can add index using :meth:`~add_index`.
         """
         try:
             self.misc('setindex', [name, self.TDBITVOID])
@@ -571,6 +576,26 @@ class TyrantProtocol(object):
         :param hint: boolean; if True, the hint string is added to the return
             value.
         """
+
+        # TODO: split this function into separate functions if they return
+        # different results:
+        #
+        # - search      = misc('search', [])        --> list of keys
+        # - searchget   = misc('search', ['get'])   --> list of items
+        # - searchout   = misc('search', ['out'])   --> boolean
+        # - searchcount = misc('search', ['count']) --> integer
+        #
+        # Some functions should be of course left as keywords for the
+        # above-mentioned functions:
+        #
+        # - addcond     = misc('search', ['addcond...'])
+        # - setorder    = misc('search', ['setorder...'])
+        # - setlimit    = misc('search', ['setlimit...'])
+        # - hint        = misc('search', ['hint'])
+        # - metasearch stuff, including functions 'mstype', 'addcond' and 'next'.
+        #
+        # See http://1978th.net/tokyotyrant/spex.html#tcrdbapi
+
         # sanity check
         assert limit  is None or 0 <= limit, 'wrong limit value "%s"' % limit
         assert offset is None or 0 <= offset, 'wrong offset value "%s"' % offset

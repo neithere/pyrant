@@ -24,6 +24,15 @@ class Query(object):
         >>> t = Tyrant(host='localhost', port=1983)
         >>> query = t.query
 
+    .. note:: queries do *not* cache the results. You can always do that
+        yourself by assigning them to a variable in your code. However, do not
+        confuse *query object* with its *results*! The queries are lazy. This
+        means that they are not evaluated until you iterate over them or
+        request a slice. So the code ``foo = t.query`` assigns a query object
+        to the variable ``foo``, while ``foo = list(t.query)`` or
+        ``foo = t.query[:]`` assigns the *results* (i.e. a list) to that
+        variable.
+
     """
 
     def __init__(self, proto, db_type, literal=False, conditions=None,
@@ -35,7 +44,7 @@ class Query(object):
         self.literal = literal
         self._conditions = conditions or []
         self._ordering = Ordering()
-        self._cache = {}
+        #self._cache = {}
         self._proto = proto
         self._db_type = db_type
         self._columns = columns
@@ -55,25 +64,40 @@ class Query(object):
 
     def __getitem__(self, k):
         # Retrieve an item or slice from the set of results.
+
+        # XXX do we really need to cache the data? What if there are a couple
+        #     millions items and the user wants to just iterate over them in
+        #     order to calculate an aggregate? I think cache should be either
+        #     kept small or turned off by default or completely removed.
+        #     The user can always easily cache the data explicitly by keeping
+        #     the results in a variable (i.e. "records = query[:]").
+
         if not isinstance(k, (slice, int, long)):
             raise TypeError("Query indices must be integers")
 
         # Check slice integrity
-        assert (not isinstance(k, slice) and (k >= 0)) \
-            or (isinstance(k, slice) and (k.start is None or k.start >= 0) \
-            and (k.stop is None or k.stop >= 0)), \
-            "Negative indexing is not supported."
+        if isinstance(k, slice):
+            for x in k.start, k.stop:
+                if x is not None and x < 0:
+                    raise ValueError('Negative indexing is not supported')
+            if k.start and not k.stop:
+                raise ValueError('Offset without limit is not supported')
+            if k.start and k.start == k.stop:
+                raise ValueError('Zero-length slices are not supported')
+        else:
+            if k < 0:
+                raise ValueError('Negative indexing is not supported')
 
         if isinstance(k, slice):
             offset = k.start or 0
-            limit = (k.stop - offset) if k.stop is not None else MAX_RESULTS
+            limit = k.stop - (k.start or 0) if k.start else k.stop
         else:
             offset = k
             limit = 1
 
-        cache_key = "%s_%s" % (offset, limit)
-        if cache_key in self._cache:
-            return self._cache[cache_key]
+        #cache_key = "%s_%s" % (offset, limit)
+        #if cache_key in self._cache:
+        #    return self._cache[cache_key]
 
         defaults = {
             'conditions': [c.prepare() for c in self._conditions],
@@ -86,16 +110,22 @@ class Query(object):
         # Since results are keys, we need to query for actual values
         if isinstance(k, slice):
             if self._columns:
-                ret = [self._to_python_dict(key) for key in keys]
+                # in column mode we get values instead of keys
+                ret = [self._to_python(value) for value in keys]
             else:
-                ret = [self._to_python(key) for key in keys]
+                print 'using mget on %d keys' % len(keys)
+                ret = self._proto.mget(keys)
+                ret = [(k, self._to_python(v)) for k,v in ret]
         else:
             if self._columns:
-                ret = self._to_python_dict(keys[0])
-            else:
                 ret = self._to_python(keys[0])
+            else:
+                print 'using get'
+                k = keys[0]
+                v = self._proto.get(k)
+                ret = (k, self._to_python(v))
 
-        self._cache[cache_key] = ret
+        #self._cache[cache_key] = ret
 
         return ret
 
@@ -187,7 +217,7 @@ class Query(object):
             c.negate = c.negate ^ negate
             query._conditions.append(c)
 
-        # Generate Q with arguments as needed
+        # Generate Condition objects with arguments as needed
         for name, expr in kwargs.iteritems():
             c = Condition(name, expr)
             c.negate = negate
@@ -195,18 +225,8 @@ class Query(object):
 
         return query
 
-    def _parse_conditions(self, c):
-        warnings.warn(DeprecationWarning('_parse_conditions is deprecated, use Condition.prepare() instead'))
-        return (c.name, c.op, c.expr)
-
-    def _to_python(self, key):
-        elem = self._proto.get(key, self.literal)
-        elem = utils.to_python(elem, self._db_type)
-        return key, elem
-
-    def _to_python_dict(self, val):
-        vals = val.split("\x00")
-        return dict(zip(vals[:-1:2], vals[1::2]))
+    def _to_python(self, elem):
+        return utils.to_python(elem, self._db_type)
 
     #
     # PUBLIC API
@@ -218,13 +238,15 @@ class Query(object):
         per item. Expects names of columns to fetch. If none specified or '*'
         is in the names, all available columns are fetched.
 
+        .. note:: in this mode Query returns *only dictionaries* without
+            primary keys.
+
         Usage::
 
             query.columns()                # fetches whole items
             query.columns('*')             # same as above
             query.columns('name', 'age')   # only fetches data for these columns
 
-        NOTE: in this mode Query returns *only dictionaries*, no primary keys!
         """
         query = self._clone()
         query._columns = None
@@ -248,20 +270,39 @@ class Query(object):
         """
         return int(self._do_search(count=True)[0])
 
-    def delete(self):
+    def delete(self, quick=False):
         """
-        Deletes all matched items from the database.
+        Deletes all matched items from the database. Returns `True` on success
+        or `False` if the operation could not be performed.
+
+        .. warning:: current implementation is inefficient due to a bug on a
+            lower level (probably within Pyrant). The underlying function does
+            not tell us whether the operation was successful, so we perform an
+            additional query. This may substantially decrease performance in
+            some rare cases. A workaround is to use the param `quick`.
+
+        :param quick: if `True`, the method always returns `None` and does not
+            check whether the operation was successful. Useful if you call this
+            method *very* frequently. Default is `False`. Please note that this
+            param will be deprecated after the underlying code is fixed so the
+            method will always return a boolean.
+
         """
-        keys = self._do_search(out=True)
-        if self._columns:
-            ret = [self._to_python_dict(key) for key in keys]
+        # FIXME this is broken: lower level always returns empty list, not sure why
+        response = self._do_search(out=True)
+        # assert 1 == len(response)
+        # return True if response[0] == 'true' else False
+
+        # XXX emulating the proper response
+        # TODO: deprecate the `confirm` param
+        if quick:
+            return not bool(self._do_search(count=True))
         else:
-            ret = [self._to_python(key) for key in keys]
-        return ret
+            return None
 
     def exclude(self, *args, **kwargs):
         """
-        Antipode of :meth:`~pyrant.Query.filter`.
+        Antipode of :meth:`~filter`.
         """
         return self._filter(True, args, kwargs)
 
@@ -336,8 +377,17 @@ class Query(object):
         return self._filter(False, args, kwargs)
 
     def hint(self):
-        # TODO: documentation
-        return self._do_search(hint=True)
+        """
+        Returns the hint string.
+
+        .. warning:: currently this executes the query and does not cache its
+            results. If you fetch the results before or after calling this
+            method, the search will be made twice.
+
+        """
+        # TODO: the results should be cached and accessible via __getitem__
+        results = self._do_search(hint=True)    # list of keys + hint string
+        return results[-1]
 
     def intersect(self, other):
         """
@@ -352,21 +402,6 @@ class Query(object):
         the `other` but not both.
         """
         return self._add_to_metasearch(other, TyrantProtocol.TDBMSDIFF)
-
-    def order(self, name):
-        """
-        DEPRECATED, see order_by.
-        """
-
-        warnings.warn(DeprecationWarning(
-            'Method Query.order is deprecated, use Query.order_by instead.')
-        )
-
-        numeric = False
-        if '#' in name:
-            numeric = True
-            name = ''.join(name.split('#'))
-        return self.order_by(name, numeric)
 
     def order_by(self, name, numeric=False):
         """
@@ -394,9 +429,9 @@ class Query(object):
 
         query._ordering = Ordering(name, direction, numeric)
 
-        if self._ordering == query._ordering:
-            # provide link to existing cache
-            query._cache = self._cache
+        #if self._ordering == query._ordering:
+        #    # provide link to existing cache
+        #    query._cache = self._cache
 
         return query
 
@@ -600,25 +635,6 @@ class Condition(object):
 
         raise ValueError(u'could not find a definition for lookup "%s" suitable'
                          u' for value "%s"' % (self.lookup, self.expr))
-
-
-# TODO: remove this previously deprecated class
-class Q(Condition):
-    def __init__(self, *args, **kwargs):
-
-        warnings.warn(
-            DeprecationWarning('Q class in deprecated, use Condition instead.')
-        )
-
-        super(Q, self).__init__()
-
-    def __or__(self, q):
-
-        warnings.warn(
-            DeprecationWarning('Q class in deprecated, use Condition instead.')
-        )
-
-        return self
 
 
 class Ordering(object):

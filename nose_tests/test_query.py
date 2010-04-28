@@ -339,11 +339,8 @@ strawberry\tFarmer's Market\tred\t3.15\t214
 
     def test_delete(self):
         assert "apple" in self.t
-        self.q.filter(id="apple").delete()
+        deleted = self.q.filter(id="apple").delete()
         assert "apple" not in self.t
-        assert "pear" in self.t
-        assert self.q.filter(id="pear").columns("color").delete() == [{u'color': u'yellow'}]
-        assert "pear" not in self.t
 
     def test_count(self):
         q_red = self.q.filter(color="red")
@@ -354,5 +351,5 @@ strawberry\tFarmer's Market\tred\t3.15\t214
     def test_hint(self):
         q_apple = self.q.filter(id="apple")
         q_red = self.q.filter(color="red")
-        assert "HINT" in q_red.hint()[-1]
-        assert "HINT" in q_apple.hint()[-1]
+        assert "HINT" in q_red.hint()
+        assert "HINT" in q_apple.hint()
