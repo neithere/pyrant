@@ -11,7 +11,7 @@ from protocol import TyrantProtocol
 import utils
 
 
-MAX_RESULTS = 1000
+CACHE_CHUNK_SIZE = 1000
 
 
 class Query(object):
@@ -24,14 +24,13 @@ class Query(object):
         >>> t = Tyrant(host='localhost', port=1983)
         >>> query = t.query
 
-    .. note:: queries do *not* cache the results. You can always do that
-        yourself by assigning them to a variable in your code. However, do not
-        confuse *query object* with its *results*! The queries are lazy. This
-        means that they are not evaluated until you iterate over them or
-        request a slice. So the code ``foo = t.query`` assigns a query object
-        to the variable ``foo``, while ``foo = list(t.query)`` or
-        ``foo = t.query[:]`` assigns the *results* (i.e. a list) to that
-        variable.
+    .. note:: the results are cached in two ways. First, the complete list of
+        relevant keys is fetched and stored in the query object. Second, the
+        corresponding data is fetched in large chunks depending on what slices
+        or indices you request. Sometimes the chunks are not large enough and
+        we hit the database too many times. To minimize the overhead you may
+        want to increase the chunk size. You can use
+        :meth:`~pyrant.query.Query.set_chunk_size` for that purpose.
 
     """
 
@@ -44,12 +43,14 @@ class Query(object):
         self.literal = literal
         self._conditions = conditions or []
         self._ordering = Ordering()
-        #self._cache = {}
         self._proto = proto
         self._db_type = db_type
         self._columns = columns
         self._ms_type = ms_type
         self._ms_conditions = ms_conditions
+
+        # cache
+        self._cache = ResultCache(self)
 
     #
     # PYTHON MAGIC METHODS
@@ -59,7 +60,7 @@ class Query(object):
         return self.intersect(other)
 
     def __contains__(self, key):
-        keys = self._do_search()
+        keys = self._cache.get_keys(self._do_search)
         return key in keys
 
     def __getitem__(self, k):
@@ -72,62 +73,38 @@ class Query(object):
         #     The user can always easily cache the data explicitly by keeping
         #     the results in a variable (i.e. "records = query[:]").
 
-        if not isinstance(k, (slice, int, long)):
+        if isinstance(k, slice):
+            return self._get_slice(k)
+        elif isinstance(k, (int, long)):
+            return self._get_item(k)
+        else:
             raise TypeError("Query indices must be integers")
 
-        # Check slice integrity
-        if isinstance(k, slice):
-            for x in k.start, k.stop:
-                if x is not None and x < 0:
-                    raise ValueError('Negative indexing is not supported')
-            if k.start and not k.stop:
-                raise ValueError('Offset without limit is not supported')
-            if k.start and k.start == k.stop:
-                raise ValueError('Zero-length slices are not supported')
-        else:
-            if k < 0:
+    def _get_slice(self, s):
+        # Check slice integrity    XXX check if this is still resonable
+        for x in s.start, s.stop:
+            if x is not None and x < 0:
                 raise ValueError('Negative indexing is not supported')
+        if s.start and s.start == s.stop:
+            raise ValueError('Zero-length slices are not supported')
 
-        if isinstance(k, slice):
-            offset = k.start or 0
-            limit = k.stop - (k.start or 0) if k.start else k.stop
-        else:
-            offset = k
-            limit = 1
+        # retrieve and cache keys
+        self._cache.get_keys(self._do_search)
 
-        #cache_key = "%s_%s" % (offset, limit)
-        #if cache_key in self._cache:
-        #    return self._cache[cache_key]
+        items = self._cache.get_items(s.start or 0, s.stop)
+        return list(items)
 
-        defaults = {
-            'conditions': [c.prepare() for c in self._conditions],
-            'limit': limit,
-            'offset': offset,
-        }
+    def _get_item(self, index):
+        if index < 0:
+            raise ValueError('Negative indexing is not supported')
 
-        keys = self._do_search(**defaults)
+        # retrieve and cache keys
+        self._cache.get_keys(self._do_search)
 
-        # Since results are keys, we need to query for actual values
-        if isinstance(k, slice):
-            if self._columns:
-                # in column mode we get values instead of keys
-                ret = [self._to_python(value) for value in keys]
-            else:
-                print 'using mget on %d keys' % len(keys)
-                ret = self._proto.mget(keys)
-                ret = [(k, self._to_python(v)) for k,v in ret]
-        else:
-            if self._columns:
-                ret = self._to_python(keys[0])
-            else:
-                print 'using get'
-                k = keys[0]
-                v = self._proto.get(k)
-                ret = (k, self._to_python(v))
-
-        #self._cache[cache_key] = ret
-
-        return ret
+        item = self._cache.get_item(index)
+        if item is None:
+            raise IndexError
+        return item
 
     def __len__(self):
         return len(self[:])
@@ -180,7 +157,7 @@ class Query(object):
         return Query(self._proto, self._db_type, **defaults)
 
     def _do_search(self, conditions=None, limit=None, offset=None,
-                   out=False, count=False, hint=False):
+                   out=False, count=False, hint=False, columns=None):
         """
         Returns keys of items that correspond to the Query instance.
         """
@@ -192,8 +169,8 @@ class Query(object):
             'limit': limit,
             'offset': offset,
         }
-        if self._columns:
-            defaults.update(columns=self._columns[:])
+        if columns:
+            defaults.update(columns=columns[:])
         if self._ordering:
             defaults.update(
                 order_column = self._ordering.name,
@@ -234,12 +211,13 @@ class Query(object):
 
     def columns(self, *names):
         """
-        Returns a Query instance which will only retrieve specified columns
-        per item. Expects names of columns to fetch. If none specified or '*'
-        is in the names, all available columns are fetched.
+        Returns a list of items with only specified columns per item. Expects
+        names of columns to fetch. If none specified or '*' is in the names,
+        all available columns are fetched. Current query object is not
+        modified. Returned is a list of dictionaries, not a derivative query.
 
-        .. note:: in this mode Query returns *only dictionaries* without
-            primary keys.
+        .. note:: primary keys are *not* returned along with data, so this is
+            not an equivalent for ``SELECT x`` of SQL.
 
         Usage::
 
@@ -247,22 +225,18 @@ class Query(object):
             query.columns('*')             # same as above
             query.columns('name', 'age')   # only fetches data for these columns
 
+        .. warning:: results are not cached in any way.
+
+        This method does not retrieve "normal" cached items and filter their
+        contents; instead, it issues a modified search statement and retrieves
+        pre-filtered items directly from the database. This is much faster than
+        fetching and processing the whole bulk of data in Python.
+
         """
-        query = self._clone()
-        query._columns = None
-        if names:
-            query._columns = []
-            for name in names:
-                if isinstance(names, (tuple, list)):
-                    query._columns.extend(names)
-                elif isinstance(args, (str, unicode)):
-                    if names == '*':
-                        query._columns = None
-                        break
-                    query._columns.append(names)
-                else:
-                    raise TypeError("%s is not supported for describing columns" % arg)
-        return query
+        if '*' in names:
+            return self[:]
+        values = self._do_search(columns=names)
+        return [self._to_python(value) for value in values]
 
     def count(self):
         """
@@ -302,7 +276,7 @@ class Query(object):
 
     def exclude(self, *args, **kwargs):
         """
-        Antipode of :meth:`~filter`.
+        Antipode of :meth:`~pyrant.query.Query.filter`.
         """
         return self._filter(True, args, kwargs)
 
@@ -429,11 +403,27 @@ class Query(object):
 
         query._ordering = Ordering(name, direction, numeric)
 
-        #if self._ordering == query._ordering:
-        #    # provide link to existing cache
-        #    query._cache = self._cache
+        if self._ordering == query._ordering:
+            # provide link to existing cache
+            query._cache = self._cache
 
         return query
+
+    def set_chunk_size(self, size=None):
+        """
+        Sets cache chunk size. Makes sense only if the query has not been
+        executed yet.
+
+        :param size: an `int` (custom size) or `None` (default size).
+
+        Useful if you expect a really large number of results and want to cut
+        the number of database hits. In this case you will increase the chunk
+        size for given query object.
+
+        .. note:: any existing cache for this query will be dropped.
+
+        """
+        self._cache = ResultCache(self, chunk_size=size)
 
     def stat(self):
         """
@@ -687,3 +677,95 @@ class Ordering(object):
     @property
     def type(self):
         return self.PROTOCOL_MAP[self.direction][self.method]
+
+
+class ResultCache(object):
+    """
+    Represents query results. Implements result caching by chunks. Supports
+    slicing and access by item index. Intended to be used internally by
+    :class:`~pyrant.query.Query` objects.
+    """
+    def __init__(self, query, chunk_size=None):
+        self.query = query
+        self.chunks = {}
+        self.keys = None
+        self.chunk_size = chunk_size or CACHE_CHUNK_SIZE
+
+    def get_keys(self, getter):
+        """
+        Returns cached list of keys. If it is not yet defined, calls the
+        `getter` which must provide such list.
+        """
+        assert hasattr(getter, '__call__'), (
+            'getter must be a callable, got %s' % getter)
+        if self.keys is None:
+            keys = getter()
+            assert hasattr(keys, '__iter__'), (
+                'getter must return an iterable, got %s' % keys)
+            self.keys = list(keys)
+        return self.keys
+
+    def get_item(self, index):
+        """
+        Returns an item corresponding to current query and given index. Fills
+        related chunk of cache behind the scenes.
+        """
+        chunk = self.get_chunk_number(index)
+        items = self.get_chunk_data(chunk)
+        start, _ = self.get_chunk_boundaries(chunk)
+        return items[index - start]
+
+    def get_items(self, start, stop=None):
+        """
+        Generates a sequence of items corresponding to current query and given
+        slice boundaries. Fills related chunks of cache behind the scenes.
+        """
+        if stop:
+            assert start < stop
+        chunk = self.get_chunk_number(start)
+        while 1:
+            data = self.get_chunk_data(chunk)
+            if data is None:
+                raise StopIteration
+            for i, item in enumerate(data):
+                if stop and stop <= i:
+                    raise StopIteration
+                yield item
+            chunk +=1
+
+    def get_chunk_number(self, index):
+        """
+        Returns the number of chunk to which given item index belongs. For
+        example, if chunk size is set to 10, item #5 will belong to chunk #0
+        and item with index #25 will be found in chunk #2.
+        """
+        return index / self.chunk_size
+
+    def get_chunk_boundaries(self, number):
+        """
+        Returns first and last item indices that belong to given chunk. For
+        example, if chunk size is set to 10, the first chunk will have
+        boundaries `(0, 9)`, the second -- `(10, 19)` and so on.
+        """
+        start = number * self.chunk_size
+        stop = start + self.chunk_size - 1
+        return start, stop
+
+    def get_chunk_data(self, number):
+        """
+        Returns a list of items that belong to given chunk. Hits the database
+        and fills chunk cache. If there are no items for the chunk, returns
+        `None`.
+        """
+        items = self.chunks.setdefault(number, [])
+        if not items:
+            # fill cache chunk
+            start, stop = self.get_chunk_boundaries(number)
+            assert self.keys is not None, 'Cache keys must be filled by query'
+            keys = self.keys[start:stop]
+            if not keys:
+                return None
+            pairs = self.query._proto.mget(keys)
+            # extend previously created empty list
+            items += [(k, self.query._to_python(v)) for k,v in pairs]
+        return items

@@ -301,7 +301,7 @@ strawberry\tFarmer's Market\tred\t3.15\t214
     def test_columns(self):
         q = self.q.filter(id="apple")
         assert q.columns("id", "store")[0] == dict(id="apple", store="Convenience Store")
-        assert q.columns(*"id color".split())[0] == dict(id="apple", color="red")
+        assert q.columns("id", "color")[0] == dict(id="apple", color="red")
         assert q.columns("price", "stock")[:] == [dict(price="1.20", stock="120")]
 
     def test_union(self):
