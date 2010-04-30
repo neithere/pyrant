@@ -6,6 +6,7 @@ try:
     set
 except NameError:
     from sets import Set as set
+import uuid
 
 # testing
 import unittest
@@ -99,6 +100,19 @@ class TestTyrant(unittest.TestCase):
 
     def test_concat(self):
         self.fail("Code and doc revision needed")
+
+    def test_generate_key(self):
+        # test autoincrement
+        assert '1' == self.t.generate_key()
+        assert '2' == self.t.generate_key()
+
+        # test UUID on server fail (the fail is faked by monkey-patching)
+        real_genuid = self.t.proto.genuid
+        def fake_genuid():
+            raise ValueError
+        self.t.proto.genuid = fake_genuid
+        assert isinstance(self.t.generate_key(), uuid.UUID)
+        self.t.proto.genuid = real_genuid
 
     def test_get_size(self):
         self.assertRaises(KeyError, lambda:self.t.get_size("melon"))

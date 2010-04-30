@@ -30,6 +30,7 @@ Usage example (note the automatically managed support for table database)::
 """
 
 import itertools as _itertools
+import uuid
 
 # pyrant
 import exceptions
@@ -38,7 +39,7 @@ import query
 import utils
 
 
-__version__ = '0.5.1'
+__version__ = '0.6.0'
 __all__ = ['Tyrant']
 
 
@@ -204,6 +205,17 @@ class Tyrant(object):
             self.proto.putcat(key, value)
         else:
             self.proto.putshl(key, value, width)
+
+    def generate_key(self):
+        """
+        Returns a unique primary key for given database. Tries to obtain the
+        key using database's built-in function `genuid`. If `genuid` fails to
+        provide the key, a UUID is generated instead.
+        """
+        try:
+            return self.proto.genuid()
+        except ValueError:
+            return uuid.uuid4()
 
     def get_size(self, key):
         """

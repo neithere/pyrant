@@ -321,6 +321,16 @@ class TyrantProtocol(object):
         """
         self._sock.send(self.OUT, _ulen(key), key)
 
+    def genuid(self):
+        """
+        Generates and returns a unique primary key. Raises `ValueError` if the
+        database could not return sensible data.
+        """
+        res = self.misc('genuid', [])
+        if not len(res) == 1 or not res[0]:
+            raise ValueError('Could not generate primary key: got "%s"' % res)
+        return res[0]
+
     def get(self, key, literal=False):
         """
         Returns the value of `key` as stored on the server::
