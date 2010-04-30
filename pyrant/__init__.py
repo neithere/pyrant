@@ -30,6 +30,8 @@ Usage example (note the automatically managed support for table database)::
 """
 
 import itertools as _itertools
+
+# pyrant
 import exceptions
 import protocol
 import query

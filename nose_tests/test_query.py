@@ -98,6 +98,40 @@ strawberry\tFarmer's Market\tred\t3.15\t214
     def _set_test_data(self):
         self.t.update(self.data)
 
+    def test_slices(self):
+        q = self.q.order_by('id')
+        # we use exclude() with different dummy conditions to make sure that
+        # each query object is "clean", i.e. no cache is shared between it and
+        # its anchestor
+        assert 6 == len(q.exclude(a=123))
+        assert 6 == len(q.exclude(a=456)[:])
+        assert 6 == len(list(q.exclude(a=789)))
+        assert q.exclude(a=135).order_by('id')[0][0] == 'apple'
+
+        keys = 'apple blueberry peach pear raspberry strawberry'.split()
+        def sliced(start=None, stop=None):
+            return [k for k,v in q.exclude(a=246).order_by('id')[start:stop]]
+        assert sliced(None, None) == keys[:]
+        assert sliced(0, None) == keys[0:]
+        assert sliced(None, 1) == keys[:1]
+        assert sliced(0, 2) == keys[0:2]
+        assert sliced(2, 4) == keys[2:4]
+
+    def test_cache_chunks(self):
+        keys = 'apple blueberry peach pear raspberry strawberry'.split()
+        q = self.q.exclude(a=123).order_by('id')
+        def sliced(q, chunk_size, start=None, stop=None):
+            q.set_chunk_size(chunk_size)  # this drops cache
+            return [k for k,v in q.order_by('id')[start:stop]]
+        assert sliced(q, 1, 2, 4) == keys[2:4]
+        assert sliced(q, 2, 2, 4) == keys[2:4]
+        print sliced(q, 3, 2, 4), 'vs', keys[2:4]
+        assert sliced(q, 3, 2, 4) == keys[2:4]
+        assert sliced(q, 4, 2, 4) == keys[2:4]
+        assert sliced(q, 5, 2, 4) == keys[2:4]
+        assert sliced(q, 3, 2, None) == keys[2:]
+        assert sliced(q, 3, None, 2) == keys[:2]
+
     def test_exact_match(self):
         #Test implicit __is operator
         apple = self.q.filter(id="apple")[:]

@@ -725,7 +725,7 @@ class ResultCache(object):
         chunk = self.get_chunk_number(start)
         while 1:
             chunk_start, chunk_stop = self.get_chunk_boundaries(chunk)
-            if stop and stop < chunk_stop:
+            if stop and stop <= chunk_start:
                 raise StopIteration
             data = self.get_chunk_data(chunk)
             if data is None:
@@ -733,7 +733,8 @@ class ResultCache(object):
             for i, item in enumerate(data):
                 if stop and stop <= chunk_start + i:
                     raise StopIteration
-                yield item
+                if start <= chunk_start + i:
+                    yield item
             chunk += 1
 
     def get_chunk_number(self, index):
@@ -762,15 +763,20 @@ class ResultCache(object):
         """
         # TODO: do not create empty chunks; check if right boundary is within
         # keys length
-        items = self.chunks.setdefault(number, [])
-        if not items:
+        if not number in self.chunks:
             # fill cache chunk
-            start, stop = self.get_chunk_boundaries(number)
             assert self.keys is not None, 'Cache keys must be filled by query'
+            start, stop = self.get_chunk_boundaries(number)
+            # make sure the chunk is not going to be empty
+            if len(self.keys) <= start:
+                return None
+            # get keys that correspond to the chunk
             keys = self.keys[start:stop+1]
             if not keys:
                 return None
+            # hit the database: retrieve values for these keys
             pairs = self.query._proto.mget(keys)
             # extend previously created empty list
-            items += [(k, self.query._to_python(v)) for k,v in pairs]
-        return items
+            prep = lambda k,v: (k, self.query._to_python(v))
+            self.chunks[number] = [prep(k,v) for k,v in pairs]
+        return self.chunks[number]
