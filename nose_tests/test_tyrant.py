@@ -195,6 +195,7 @@ class TestTyrant(unittest.TestCase):
 
     def test_multi_get(self):
         fruits = self.t.multi_get("apple melon pear".split())
+        fruits = dict(fruits)
         assert len(fruits) == 2
         assert "apple" in fruits
         assert "pear" in fruits

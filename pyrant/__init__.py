@@ -39,7 +39,7 @@ import query
 import utils
 
 
-__version__ = '0.6.0'
+__version__ = '0.6.1'
 __all__ = ['Tyrant']
 
 
@@ -250,15 +250,30 @@ class Tyrant(object):
         return list(self.iterkeys())
 
     def itervalues(self):
-        for key in self.iterkeys():
-            yield self[key]
+        for k, v in self.iteritems():
+            yield v
 
     def values(self):
         return list(self.itervalues())
 
     def iteritems(self):
+        """
+        Returns a generator with key/value pairs. The data is read from the
+        database in chunks to alleviate the issues of a) too many database
+        hits, and b) too heavy memory usage when only a part of the list is
+        actually used.
+        """
+        CHUNK_SIZE = 1000
+        chunk = []
         for key in self.iterkeys():
-            yield key, self[key]
+            chunk.append(key)
+            if CHUNK_SIZE <= len(chunk):
+                for k,v in self.multi_get(chunk):
+                    yield k,v
+                chunk = []
+        if chunk:
+            for k,v in self.multi_get(chunk):
+                yield k,v
 
     def items(self):
         return list(self.iteritems())
@@ -280,9 +295,15 @@ class Tyrant(object):
 
     def update(self, mapping=None, **kwargs):
         """
-        Updates given objets from a dict, list of key and value pairs or a list of named params.
+        Updates given objects from a dict, list of key and value pairs or a
+        list of named params. Usage::
 
-        See update method in python built-in object for more info
+            mapping = (
+                ('john', dict(name='John')),
+            )
+            t.update(mapping, mary={'name': 'Mary'})
+
+        See built-in `dict.update` method for more information.
         """
         data = dict(mapping or {}, **kwargs)
         self.multi_set(data)
@@ -296,51 +317,50 @@ class Tyrant(object):
         if not isinstance(keys, (list, tuple)):
             keys = list(keys)
 
-        self.proto.misc("outlist", keys, opts)
+        self.proto.misc('outlist', keys, opts)
 
-    def multi_get(self, keys, no_update_log=False):
+    def multi_get(self, keys):
         """
-        Returns a list of records that match given keys.
+        Returns records that match given keys. Missing keys are silently
+        ignored, i.e. the number of results may be lower than the number of
+        requested keys. The records are returned as key/value pairs. Usage::
+
+            >>> g = t.multi_get(['foo', 'bar', 'galakteko opasnoste'])
+            >>> g
+            [('foo', {'one': 'one'}), ('bar', {'two': 'two'})]
+
+        :param keys: the list of keys.
+
         """
         # TODO: write better documentation: why would user need the no_update_log param?
-        opts = (no_update_log and protocol.TyrantProtocol.RDBMONOULOG or 0)
-        if not isinstance(keys, (list, tuple)):
-            keys = list(keys)
+        assert hasattr(keys, '__iter__'), 'expected iterable, got %s' % keys
+        prep_val = lambda v: utils.to_python(v, self.db_type, self.separator)
 
-        rval = self.proto.misc("getlist", keys, opts)
-
-        if len(rval) <= len(keys):
-            # 1.1.10 protocol, may return invalid results
-            if len(rval) < len(keys):
-                raise KeyError("Missing a result, unusable response in 1.1.10")
-
-            return rval
-
-        # 1.1.11 protocol returns interleaved key, value list
-        d = dict((rval[i], utils.to_python(rval[i + 1], self.db_type, self.separator))
-                    for i in xrange(0, len(rval), 2))
-        return d
+        keys = list(keys)
+        data = self.proto.misc('getlist', keys, 0)
+        data_keys = data[::2]
+        data_vals = (prep_val(x) for x in data[1::2])
+        return zip(data_keys, data_vals)
 
     def multi_set(self, items, no_update_log=False):
         """
         Stores given records in the database.
         """
         opts = (no_update_log and protocol.TyrantProtocol.RDBMONOULOG or 0)
-        lst = []
-        for k, v in items.iteritems():
-            if isinstance(v, (dict)):
-                new_v = []
-                for kk, vv in v.items():
-                    new_v.append(kk)
-                    new_v.append(vv)
-                v = new_v
-            if isinstance(v, (list, tuple)):
-                assert self.separator, "Separator is not set"
+        ready_pairs = []
+        for key, value in items.iteritems():
+            if isinstance(value, dict):
+                # make flat list of interleaved key/value pairs
+                new_value = []
+                for pair in value.items():
+                    new_value.extend(pair)
+                value = new_value
+            if hasattr(value, '__iter__'):
+                assert self.separator, 'Separator is not set'
+                value = self.separator.join(value)
+            ready_pairs.extend((key, value))
 
-                v = self.separator.join(v)
-            lst.extend((k, v))
-
-        self.proto.misc("putlist", lst, opts)
+        self.proto.misc('putlist', ready_pairs, opts)
 
     def prefix_keys(self, prefix, maxkeys=None):
         """
