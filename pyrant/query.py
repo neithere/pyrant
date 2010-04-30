@@ -724,14 +724,17 @@ class ResultCache(object):
             assert start < stop
         chunk = self.get_chunk_number(start)
         while 1:
+            chunk_start, chunk_stop = self.get_chunk_boundaries(chunk)
+            if stop and stop < chunk_stop:
+                raise StopIteration
             data = self.get_chunk_data(chunk)
             if data is None:
                 raise StopIteration
             for i, item in enumerate(data):
-                if stop and stop <= i:
+                if stop and stop <= chunk_start + i:
                     raise StopIteration
                 yield item
-            chunk +=1
+            chunk += 1
 
     def get_chunk_number(self, index):
         """
@@ -757,12 +760,14 @@ class ResultCache(object):
         and fills chunk cache. If there are no items for the chunk, returns
         `None`.
         """
+        # TODO: do not create empty chunks; check if right boundary is within
+        # keys length
         items = self.chunks.setdefault(number, [])
         if not items:
             # fill cache chunk
             start, stop = self.get_chunk_boundaries(number)
             assert self.keys is not None, 'Cache keys must be filled by query'
-            keys = self.keys[start:stop]
+            keys = self.keys[start:stop+1]
             if not keys:
                 return None
             pairs = self.query._proto.mget(keys)
