@@ -711,7 +711,7 @@ class ResultCache(object):
         related chunk of cache behind the scenes.
         """
         chunk = self.get_chunk_number(index)
-        items = self.get_chunk_data(chunk)
+        items = self.get_chunk_data(chunk) or []
         start, _ = self.get_chunk_boundaries(chunk)
         return items[index - start]
 

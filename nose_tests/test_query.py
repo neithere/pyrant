@@ -120,17 +120,33 @@ strawberry\tFarmer's Market\tred\t3.15\t214
     def test_cache_chunks(self):
         keys = 'apple blueberry peach pear raspberry strawberry'.split()
         q = self.q.exclude(a=123).order_by('id')
+
+        # multiple elems by slice
         def sliced(q, chunk_size, start=None, stop=None):
             q.set_chunk_size(chunk_size)  # this drops cache
             return [k for k,v in q.order_by('id')[start:stop]]
         assert sliced(q, 1, 2, 4) == keys[2:4]
         assert sliced(q, 2, 2, 4) == keys[2:4]
-        print sliced(q, 3, 2, 4), 'vs', keys[2:4]
         assert sliced(q, 3, 2, 4) == keys[2:4]
         assert sliced(q, 4, 2, 4) == keys[2:4]
         assert sliced(q, 5, 2, 4) == keys[2:4]
         assert sliced(q, 3, 2, None) == keys[2:]
         assert sliced(q, 3, None, 2) == keys[:2]
+
+        # single elem by index
+        def get_item(q, chunk_size, index):
+            q.set_chunk_size(chunk_size)  # this drops cache
+            key, data = q.order_by('id')[index]
+            return data
+        assert get_item(q, 1, 0) == self.t[ keys[0] ]
+        assert get_item(q, 1, 1) == self.t[ keys[1] ]
+        assert get_item(q, 1, 2) == self.t[ keys[2] ]
+        assert get_item(q, 2, 0) == self.t[ keys[0] ]
+        assert get_item(q, 2, 1) == self.t[ keys[1] ]
+        assert get_item(q, 2, 2) == self.t[ keys[2] ]
+        assert get_item(q, 3, 1) == self.t[ keys[1] ]
+        self.assertRaises(IndexError,
+                          lambda: get_item(q, 3, 10) == self.t[ keys[1] ])
 
     def test_exact_match(self):
         #Test implicit __is operator
