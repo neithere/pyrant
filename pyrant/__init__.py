@@ -29,7 +29,7 @@ Usage example (note the automatically managed support for table database)::
 
 """
 
-import itertools as _itertools
+import itertools as _itertools  # EXPLAIN why is it necessary to rename module?
 import uuid
 
 # pyrant
@@ -147,10 +147,11 @@ class Tyrant(object):
         Additional types conversion is only done if the value is a dictionary.
         """
         if isinstance(value, dict):
+            # EXPLAIN why the 'from_python' conversion is necessary, as there is no straight forward way of restoring the python objects. What about limiting the allowed keys and values to string only, an raise exception on any other object type?
             flat = list(_itertools.chain(*((k, utils.from_python(v)) for
                                             k,v in value.iteritems())))
             args = [key] + flat
-            self.proto.misc('put', args)
+            self.proto.misc('put', args)  # EXPLAIN why is this hack necessary?
         else:
             if isinstance(value, (list, tuple)):
                 assert self.separator, "Separator is not set"
@@ -344,16 +345,31 @@ class Tyrant(object):
 
     def multi_set(self, items, no_update_log=False):
         """
-        Stores given records in the database.
+        Stores the given records in the database. The records may be given
+        as an iterable sequence. Usage::
+
+           >>> t.multi_set([('foo', {'one': 'one'}), ('bar', {'two': 'two'})])
+
+        which is equevalent with the call:
+        
+           >>> t.multi_set({'foo': {'one': 'one'}, 'bar':{'two': 'two'}})
+           
+        :param items: the sequence of records to be stored.
+        
         """
         opts = (no_update_log and protocol.TyrantProtocol.RDBMONOULOG or 0)
         ready_pairs = []
-        for key, value in items.iteritems():
+        # HACK To allow for items to be given in a sequence, as e.g. the list returned from multi_get.
+        if isinstance(items, dict):
+            iterator = items.iteritems()
+        else:
+            iterator = iter(items)
+        for key, value in iterator:
             if isinstance(value, dict):
                 # make flat list of interleaved key/value pairs
                 new_value = []
                 for pair in value.items():
-                    new_value.extend(pair)
+                    new_value.extend(pair)  # EXPLAIN why is utils.from_python() not used here?
                 value = new_value
             if hasattr(value, '__iter__'):
                 assert self.separator, 'Separator is not set'
