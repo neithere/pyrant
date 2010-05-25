@@ -350,7 +350,7 @@ class Tyrant(object):
 
            >>> t.multi_set([('foo', {'one': 'one'}), ('bar', {'two': 'two'})])
 
-        which is equevalent with the call:
+        which is equevalent with the call::
         
            >>> t.multi_set({'foo': {'one': 'one'}, 'bar':{'two': 'two'}})
            
@@ -392,14 +392,24 @@ class Tyrant(object):
     def sync(self):
         """
         Synchronizes updated content with the database.
+        
+        Tokyo Cabinet is not durable, as data committed to the database is not
+        immediately flushed to disk. Unwritten data may lost in the event of
+        e.g. a system crash.
+        
+        Use `sync` to force a flush of unwritten data to disk, but be aware that
+        this also locks the writer process and blocks queries.
+        
+        The better approach is to use database replication (copy the data to
+        another database instance) and backup often.
         """
-        # TODO: write better documentation: when would user need this?
         self.proto.sync()
 
     @property
     def query(self):
         """
         Returns a :class:`~pyrant.Query` object for the database.
+        Note: Only available for Table Databases.
         """
         if not self.table_enabled:
             raise TypeError('Query only works with table databases but %s is a '

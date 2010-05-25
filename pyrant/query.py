@@ -123,19 +123,21 @@ class Query(object):
     # PRIVATE METHODS
     #
 
-    def _add_to_metasearch(self, other, method):
+    def _add_to_metasearch(self, other, operator):
         """
-        Returns a Query instance made from current one and the ``other`` using
-        given ``method``.
+        Returns a new Query object resulting from mapping `self` with ``other``
+        by applying the given ``operator`` which is one of the operators defined
+        in Tokyo Tyrant protocol: `TyrantProtocol.TDBMSUNION`,
+        `TyrantProtocol.TDBMSISECT` or `TyrantProtocol.TDBMSDIFF`.
         """
         query = self._clone()
         assert isinstance(other, Query), "This function needs other Query object type"
-        assert query._ms_type in (None, method), "You can not mix union with intersect or minus"
-        if not query._ms_conditions:
+        assert query._ms_type in (None, operator), "You can not mix union with intersect or minus"
+        if query._ms_conditions is None:
             query._ms_conditions = []
         other = other._clone()
         query._ms_conditions.append(other._conditions)
-        query._ms_type = method
+        query._ms_type = operator
         return query
 
     def _clone(self):
@@ -177,9 +179,13 @@ class Query(object):
                 order_type   = self._ordering.type,
             )
         if self._ms_conditions:
-            defaults.update(    # FIXME make this more readable
+            # update search conditions with metaseach conditions
+            defaults.update(
                 ms_type = self._ms_type,
-                ms_conditions = [[c.prepare() for c in ms_c] for ms_c in self._ms_conditions]
+                ms_conditions = [
+                    [condition.prepare() for condition in metasearch_conditions]
+                    for metasearch_condictions in self._ms_conditions
+                ]
             )
 
         return self._proto.search(**defaults)
@@ -432,7 +438,7 @@ class Query(object):
         collected = {}
         for _, data in self[:]:
             for k in data:
-                collected[k] = collected.setdefault(k, 0) + 1
+                collected[k] = collected.get(k, 0) + 1
         return collected
 
     def union(self, other):
