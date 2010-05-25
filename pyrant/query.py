@@ -446,14 +446,7 @@ class Query(object):
         """
         Returns a list of unique values for given key.
         """
-        # TODO: use self.columns()
-        collected = {}
-        for _, data in self[:]:
-            for k,v in data.iteritems():
-                if k == key and v not in collected:
-                    collected[v] = 1
-        return collected.keys()
-
+        return list(set(d[key] for d in self.columns(key)))
 
 class Lookup(object):
     """
