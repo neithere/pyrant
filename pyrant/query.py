@@ -184,7 +184,7 @@ class Query(object):
                 ms_type = self._ms_type,
                 ms_conditions = [
                     [condition.prepare() for condition in metasearch_conditions]
-                    for metasearch_condictions in self._ms_conditions
+                    for metasearch_conditions in self._ms_conditions
                 ]
             )
 
