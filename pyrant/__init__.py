@@ -29,7 +29,7 @@ Usage example (note the automatically managed support for table database)::
 
 """
 
-import itertools as _itertools  # EXPLAIN why is it necessary to rename module?
+import itertools
 import uuid
 
 # pyrant
@@ -117,6 +117,9 @@ class Tyrant(object):
             raise KeyError(key)
 
     def __getitem__(self, key):
+        if not isinstance(key, (str, unicode)):
+            raise TypeError('Primary key must be a string, got %s "%s"'
+                            % (type(key).__name__, key))
         try:
             elem = self.proto.get(key, self.literal)
             return utils.to_python(elem, self.db_type, self.separator)
@@ -148,8 +151,8 @@ class Tyrant(object):
         """
         if isinstance(value, dict):
             # EXPLAIN why the 'from_python' conversion is necessary, as there is no straight forward way of restoring the python objects. What about limiting the allowed keys and values to string only, an raise exception on any other object type?
-            flat = list(_itertools.chain(*((k, utils.from_python(v)) for
-                                            k,v in value.iteritems())))
+            flat = list(itertools.chain(*((k, utils.from_python(v)) for
+                                           k,v in value.iteritems())))
             args = [key] + flat
             self.proto.misc('put', args)  # EXPLAIN why is this hack necessary?
         else:
@@ -309,6 +312,39 @@ class Tyrant(object):
         data = dict(mapping or {}, **kwargs)
         self.multi_set(data)
 
+    def multi_add(self, values, chunk_size=1000, no_update_log=False):
+        """
+        Adds given values as new records and returns a list of automatically
+        generated primary keys for these records. Wrapper for
+        :meth:`~pyrant.Tyrant.multi_set`.
+
+        :param values: any iterable; in fact, you can pass a generator and it
+            will be processed in chunks in order to save on resources and
+            cut down the database hit at the same time.
+        :param chunk_size: size of chunks in which the data will be fed to the
+            database. If set to zero, data is fed to database in one chunk.
+
+        """
+        keys = self._multi_add(values=values, chunk_size=chunk_size,
+                               no_update_log=no_update_log)
+        return list(keys)
+
+    def _multi_add(self, values, chunk_size=1000, no_update_log=False):
+        assert hasattr(values, '__iter__'), 'values must be an iterable'
+        chunk = []
+        for value in values:
+            'value', value
+            key = self.generate_key()
+            yield key
+            chunk.append((key, value))
+            if 0 < chunk_size < len(chunk):
+                # chunk has grown big, need to feed the database
+                self.multi_set(chunk, no_update_log=no_update_log)
+                chunk = []
+        else:
+            # feed the remnants
+            self.multi_set(chunk, no_update_log=no_update_log)
+
     def multi_del(self, keys, no_update_log=False):
         """
         Removes given records from the database.
@@ -351,12 +387,29 @@ class Tyrant(object):
            >>> t.multi_set([('foo', {'one': 'one'}), ('bar', {'two': 'two'})])
 
         which is equevalent with the call::
-        
+
            >>> t.multi_set({'foo': {'one': 'one'}, 'bar':{'two': 'two'}})
-           
+
         :param items: the sequence of records to be stored.
-        
+
         """
+        # TODO: add here and in other places (in this module and protocol)
+        # notes on the no-update-log param:
+        #
+        # One thing worth noting is  that you can choose replication option
+        # when you call from TT. By default, all your operation will be written
+        # to update logging files. If you call with RDBMONOULOG option, then it
+        # won't record update log nor replication. If you are doing get or
+        # search operation which does not require replication, you should call
+        # with RDBMONOULOG.
+        # If you want to initialise or optimise, but not replicate tcrdbsync,
+        # tcrdboptimize, tcrdbvanish, then you should call it with RDBMONOULOG,
+        # too.
+        #  You can do quite a lot if you call "misc" from Lua extensions.
+        #
+        # source:
+        # http://tokyocabinetwiki.pbworks.com/37_hidden_features_of_the_misc_method
+
         opts = (no_update_log and protocol.TyrantProtocol.RDBMONOULOG or 0)
         ready_pairs = []
         # HACK To allow for items to be given in a sequence, as e.g. the list returned from multi_get.
@@ -373,7 +426,8 @@ class Tyrant(object):
                 value = new_value
             if hasattr(value, '__iter__'):
                 assert self.separator, 'Separator is not set'
-                value = self.separator.join(value)
+                strings = (str(x) for x in value)
+                value = self.separator.join(strings)
             ready_pairs.extend((key, value))
 
         self.proto.misc('putlist', ready_pairs, opts)
@@ -392,14 +446,14 @@ class Tyrant(object):
     def sync(self):
         """
         Synchronizes updated content with the database.
-        
+
         Tokyo Cabinet is not durable, as data committed to the database is not
         immediately flushed to disk. Unwritten data may lost in the event of
         e.g. a system crash.
-        
+
         Use `sync` to force a flush of unwritten data to disk, but be aware that
         this also locks the writer process and blocks queries.
-        
+
         The better approach is to use database replication (copy the data to
         another database instance) and backup often.
         """
