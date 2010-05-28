@@ -463,7 +463,9 @@ class Tyrant(object):
     def query(self):
         """
         Returns a :class:`~pyrant.Query` object for the database.
-        Note: Only available for Table Databases.
+
+        .. note:: Only available for Table Databases.
+
         """
         if not self.table_enabled:
             raise TypeError('Query only works with table databases but %s is a '
