@@ -493,7 +493,10 @@ class Lookup(object):
                 return False
         if self.numeric:
             if not isinstance(value, (int, float)):
-                return False
+                try:
+                    int(value)
+                except (ValueError, TypeError):
+                    return False
         if self.string:
             if not isinstance(value, basestring):
                 return False
@@ -557,9 +560,9 @@ class Condition(object):
         self.expr = expr
         self.negate = negate
 
-    def __repr__(self):
-        return u'<%s %s%s "%s">' % (self.name, ('not ' if self.negate else ''),
-                                     self.lookup, self.expr)
+    def __repr__(self):  # pragma: nocover
+        return u'<%s %s%s %s>' % (self.name, ('not ' if self.negate else ''),
+                                     self.lookup, repr(self.expr))
 
     def _clone(self):
         return copy.copy(self)
@@ -666,7 +669,7 @@ class Ordering(object):
     def __nonzero__(self):
         return bool(self.name)
 
-    def __repr__(self):
+    def __repr__(self):  # pragma: nocover
         return u'<Order by %s (%s, %s)>' % (
             self.name,
             'desc' if self.direction else 'asc',

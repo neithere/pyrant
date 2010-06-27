@@ -150,7 +150,14 @@ class Tyrant(object):
         Additional types conversion is only done if the value is a dictionary.
         """
         if isinstance(value, dict):
-            # EXPLAIN why the 'from_python' conversion is necessary, as there is no straight forward way of restoring the python objects. What about limiting the allowed keys and values to string only, an raise exception on any other object type?
+            # check if there are no keys that would become empty strings
+            if not all(unicode(k) for k in value):
+                raise KeyError('Empty keys are not allowed (%s).' % repr(value))
+
+            # EXPLAIN why the 'from_python' conversion is necessary, as there
+            # is no straight forward way of restoring the python objects. What
+            # about limiting the allowed keys and values to string only, an
+            # raise exception on any other object type?
             flat = list(itertools.chain(*((k, utils.from_python(v)) for
                                            k,v in value.iteritems())))
             args = [key] + flat

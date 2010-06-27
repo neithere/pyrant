@@ -114,6 +114,8 @@ def to_python(value, db_type, sep=None):
         return _elem_to_python(value, sep)
 
 def _elem_to_python(elem, sep):
+    if not elem:
+        return elem
     if sep and sep in elem:
         return elem.split(sep)
     else:

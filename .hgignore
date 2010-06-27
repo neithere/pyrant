@@ -10,4 +10,5 @@ syntax: glob
 build/
 dist/
 *.egg*
-doc/_build
+.coverage
+cover/

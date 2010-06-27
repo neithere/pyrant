@@ -102,7 +102,7 @@ class _TyrantSocket(object):
         while len(d) < bytes:
             c = self._sock.recv(min(8192, bytes - len(d)))
             if not c:
-                raise socket.error('server disconnected unexpectedly')
+                raise socket.error('server disconnected unexpectedly')  # pragma: nocover
             d += c
         return d
 
@@ -328,7 +328,7 @@ class TyrantProtocol(object):
         """
         res = self.misc('genuid', [])
         if not len(res) == 1 or not res[0]:
-            raise ValueError('Could not generate primary key: got "%s"' % res)
+            raise ValueError('Could not generate primary key: %s' % repr(res))  # pragma: nocover
         return res[0]
 
     def get(self, key, literal=False):
