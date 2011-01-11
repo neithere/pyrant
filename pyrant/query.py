@@ -463,7 +463,8 @@ class Lookup(object):
     max_args = None
 
     def __init__(self, constant, iterable=False, string=False, numeric=False,
-                 boolean=False, value=None, min_args=None, max_args=None):
+                 boolean=False, value=None, min_args=None, max_args=None,
+                 extra=None):
         self.boolean = boolean
         self.iterable = iterable
         self.numeric = numeric
@@ -478,6 +479,9 @@ class Lookup(object):
             assert iterable, 'number of arguments can be specified only for iterables'
         self.min_args = min_args
         self.max_args = max_args
+
+        # additional value processor; executed per item if value is iterable
+        self.extra = extra
 
     def accepts(self, value):
         """
@@ -501,6 +505,15 @@ class Lookup(object):
             if not isinstance(value, basestring):
                 return False
         return True
+
+    def process_value(self, value):
+        if self.extra:
+            if hasattr(value, '__iter__'):
+                return [self.extra(v) for v in value]
+            else:
+                return self.extra(value)
+        else:
+            return value
 
     def validate(self, value):
         """
@@ -541,9 +554,12 @@ class Condition(object):
                          Lookup('RDBQCNUMOREQ', iterable=True, numeric=True)],
         'is':           [Lookup('RDBQCNUMEQ', numeric=True),
                          Lookup('RDBQCSTREQ')],
-        'like':         [Lookup('RDBQCFTSPH', string=True),
-                         Lookup('RDBQCFTSAND', iterable=True, string=True)],
-        'like_any':     [Lookup('RDBQCFTSOR', iterable=True, string=True)],
+        'like':         [Lookup('RDBQCFTSPH', string=True,
+                                extra=lambda v:v.lower()),
+                         Lookup('RDBQCFTSAND', iterable=True, string=True,
+                                extra=lambda v:v.lower())],
+        'like_any':     [Lookup('RDBQCFTSOR', iterable=True, string=True,
+                                extra=lambda v:v.lower())],
         'lt':           [Lookup('RDBQCNUMLT', numeric=True)],
         'lte':          [Lookup('RDBQCNUMLE', numeric=True)],
         'matches':      [Lookup('RDBQCSTRRX', string=True)],
@@ -613,6 +629,9 @@ class Condition(object):
                         # our internal negation state according to the value
                         negate = not negate
                     value = definition.value
+                else:
+                    value = definition.process_value(value)
+
                 if negate:
                     op = op | TyrantProtocol.RDBQCNEGATE
 
